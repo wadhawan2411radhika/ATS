@@ -48,8 +48,8 @@ def _synthesize(
     class SynthMeta(BaseModel):
         ideal_candidate_persona: str
         role_in_one_line: str
-        extraction_confidence: float
-        extraction_notes: list[str]
+        # extraction_confidence: float
+        # extraction_notes: list[str]
 
     system = """
 Synthesize the final summary fields for a JD extraction.
@@ -57,9 +57,6 @@ Synthesize the final summary fields for a JD extraction.
 ideal_candidate_persona: 2-3 concrete sentences about what the ideal hire looks like.
   Be specific — not generic HR language.
 role_in_one_line: One punchy sentence summarizing the role for a potential candidate.
-extraction_confidence: 0.0-1.0. How complete and unambiguous was the JD?
-  1.0 = detailed and specific. 0.5 = vague in places. 0.2 = very sparse.
-extraction_notes: List any ambiguities or low-confidence fields.
 """
     user = f"""
 Job: {role_identity.job_title} ({role_identity.seniority_level})
@@ -83,6 +80,9 @@ JD excerpt: {jd_text[:600]}
         # extraction_notes=meta.extraction_notes,
     )
 
+# extraction_confidence: 0.0-1.0. How complete and unambiguous was the JD?
+#   1.0 = detailed and specific. 0.5 = vague in places. 0.2 = very sparse.
+# extraction_notes: List any ambiguities or low-confidence fields.
 
 # ── Safe tool runner ───────────────────────────────────────────────────────────
 
@@ -146,6 +146,6 @@ def extract_jd(jd_text: str) -> JDProfile:
         f"JD extracted: '{profile.role_identity.job_title}' | "
         f"Seniority: {profile.role_identity.seniority_level} | "
         f"Required skills: {len(profile.hard_requirements.required_skills)} | "
-        f"Confidence: {profile.extraction_confidence:.2f}"
+        # f"Confidence: {profile.extraction_confidence:.2f}"
     )
     return profile

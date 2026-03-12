@@ -1,8 +1,8 @@
 from src.extraction.resume_extraction.extractor import extract_resume
 from src.extraction.resume_extraction.schemas import (
-    ResumeProfile, CandidateIdentity, WorkHistory, WorkRole,
-    SkillsProfile, EducationAndCredentials, QualitySignals,
-    SeniorityLevel, CompanyTier, CareerTrajectory
+    ResumeProfile, CandidateIdentity, WorkHistory, 
+    SkillsProfile, EducationAndCredentials, 
+    SeniorityLevel, CompanyTier
 )
 
 __all__ = [

@@ -93,11 +93,9 @@ RULES:
    ✗ "experience with Python", "building scalable systems"
 3. Copy EXACTLY what is listed. No inference, no additions, no cleanup.
 4. If the resume has no dedicated skills section, return explicit_skills: [].
-5. For skill_recency_entries: cross-reference dates from job history to classify each skill.
-   - "recent": skill appears in a role from the last 2 years
-   - "established": last used 2-5 years ago
-   - "dated": last used 5+ years ago
-   If you cannot determine recency from context, omit the entry.
+5. For skill_depth_signals: identify depth for the given skill
+Format: "SkillName: one-line evidence"
+e.g. "PyTorch: fine-tuned 13B LLaMA on 32 A100s with FSDP, 12% ROUGE improvement"
 """
     user = f"Extract explicit skills from the Skills section of this resume:\n\n---\n{resume_text}\n---"
     return extract_structured(system, user, ExplicitSkillsResult)

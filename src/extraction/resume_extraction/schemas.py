@@ -104,12 +104,6 @@ class WorkHistory(BaseModel):
     domains_worked_in: list[str] = Field(
         description="All industry domains across career. e.g. ['fintech', 'healthcare', 'e-commerce']"
     )
-
-class SkillRecencyEntry(BaseModel):
-    """Single skill + recency pair. List form avoids dict[str,str] which OpenAI Structured Outputs rejects."""
-    skill: str = Field(description="Skill name, matching exactly how it appears in explicit_skills or implicit_skills.")
-    recency: SkillRecency = Field(description="recent = used last 2yr | established = 2-5yr ago | dated = 5+yr ago")
- 
  
 class ExplicitSkillsResult(BaseModel):
     """Output of tool_extract_explicit_skills. Skills section only."""
@@ -120,11 +114,12 @@ class ExplicitSkillsResult(BaseModel):
             "No inference. No additions. If no skills section exists, return []."
         )
     )
-    skill_recency_entries: list[SkillRecencyEntry] = Field(
+    explicit_skill_depth_signals: list[str] = Field(
         default_factory=list,
         description=(
-            "Recency for each explicit skill based on when it appears in dated roles. "
-            "recent = last 2yr | established = 2-5yr | dated = 5+yr ago."
+            "2-5 skills with clear mastery evidence. Short phrase per skill. "
+            "e.g. 'PyTorch: fine-tuned 13B model on 4xA100s with FSDP'. "
+            "Only include genuinely strong signals — be selective."
         )
     )
  
@@ -138,7 +133,7 @@ class ImplicitSkillsResult(BaseModel):
             "Evidence-based only. Include domain-level concepts when overwhelmingly demonstrated."
         )
     )
-    skill_depth_signals: list[str] = Field(
+    implicit_skill_depth_signals: list[str] = Field(
         default_factory=list,
         description=(
             "2-5 skills with clear mastery evidence. Short phrase per skill. "
@@ -152,28 +147,22 @@ class SkillsProfile(BaseModel):
     """Merged skills profile assembled from explicit + implicit extraction results."""
     explicit_skills: list[str] = Field(default_factory=list)
     implicit_skills: list[str] = Field(default_factory=list)
-    skill_recency_entries: list[SkillRecencyEntry] = Field(default_factory=list)
-    skill_depth_signals: list[str] = Field(default_factory=list)
+    explicit_skill_depth_signals: list[str] = Field(default_factory=list)
+    implicit_skill_depth_signals: list[str] = Field(default_factory=list)
  
     @classmethod
     def from_results(
         cls,
-        explicit: "ExplicitSkillsResult",
-        implicit: "ImplicitSkillsResult",
+        explicit: ExplicitSkillsResult,
+        implicit: ImplicitSkillsResult,
     ) -> "SkillsProfile":
         """Merge the two focused extraction results into a single profile."""
         return cls(
             explicit_skills=explicit.explicit_skills,
             implicit_skills=implicit.implicit_skills,
-            skill_recency_entries=explicit.skill_recency_entries,
-            skill_depth_signals=implicit.skill_depth_signals,
+            explicit_skill_depth_signals=explicit.explicit_skill_depth_signals,
+            implicit_skill_depth_signals=implicit.implicit_skill_depth_signals,
         )
- 
-    @property
-    def skill_recency_map(self) -> dict[str, str]:
-        """Backward-compatible dict view of skill_recency_entries."""
-        return {e.skill: e.recency.value for e in self.skill_recency_entries}
-
 
 class EducationAndCredentials(BaseModel):
     """Education, certifications, publications, open source."""
