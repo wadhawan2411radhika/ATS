@@ -1,340 +1,410 @@
 """
-Alignment Engine.
+Alignment Engine — computes all signals needed for scoring.
 
-Takes a JDProfile (from ReAct agent) + ResumeExtracted and produces an AlignmentResult.
-This is the core "comparison" layer — deterministic logic, no LLM needed.
-The AlignmentResult is the input to the scoring layer.
+Responsibilities:
+    - Semantic skill matching (cosine similarity via sentence-transformers)
+    - Experience / YoE / seniority / domain alignment
+    - Quality signals (depth, red flags, bonus)
+    - Assembles AlignmentResult (no weights applied here)
+
+Caching:
+    JD skill embeddings are cached at module level by content hash.
+    The embedding model is lazy-loaded once on first use.
+    Resume skills are encoded fresh per call (no cross-resume caching).
 """
 
-import re
 import logging
-from sentence_transformers import SentenceTransformer, util
+from typing import Optional
 
-from src.extraction.jd_extraction import JDProfile
-from src.extraction.resume_extraction import (
-    ResumeProfile as ResumeExtracted,
-    SeniorityLevel,
-    CompanyTier,
-)
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+from src.extraction.jd_extraction.schemas import JDProfile
+from src.extraction.resume_extraction.schemas import ResumeProfile
 from src.scoring.schemas import AlignmentResult
 from config import config
 
 logger = logging.getLogger(__name__)
 
-# Seniority ordering for comparison arithmetic
-SENIORITY_ORDER = {
-    SeniorityLevel.INTERN: 0,
-    SeniorityLevel.JUNIOR: 1,
-    SeniorityLevel.MID: 2,
-    SeniorityLevel.SENIOR: 3,
-    SeniorityLevel.LEAD: 4,
-    SeniorityLevel.STAFF: 4,
-    SeniorityLevel.PRINCIPAL: 5,
-    SeniorityLevel.MANAGER: 3,
-    SeniorityLevel.DIRECTOR: 5,
-    SeniorityLevel.UNKNOWN: 2,
+
+# ── Seniority ordering ─────────────────────────────────────────────────────────
+
+SENIORITY_ORDER: dict[str, int] = {
+    "intern":    0,
+    "junior":    1,
+    "mid":       2,
+    "senior":    3,
+    "lead":      4,
+    "staff":     4,
+    "manager":   4,
+    "principal": 5,
+    "director":  6,
+    "vp":        7,
+    "executive": 8,
+    "unknown":   2,   # neutral — don't penalise when unknown
 }
 
-# Company tier → prestige score
-COMPANY_TIER_SCORE = {
-    CompanyTier.TIER_1: 1.0,
-    CompanyTier.TIER_2: 0.75,
-    CompanyTier.TIER_3: 0.5,
-    CompanyTier.TIER_4: 0.25,
-    CompanyTier.ACADEMIC: 0.5,
+# ── Matching thresholds ────────────────────────────────────────────────────────
+
+_FULL_MATCH_THRESHOLD    = 0.82   # cosine sim → full match (weight 1.0)
+_PARTIAL_MATCH_THRESHOLD = 0.65   # cosine sim → partial match (weight 0.6)
+_PARTIAL_WEIGHT          = 0.6
+
+_RECENCY_WEIGHTS: dict[str, float] = {
+    "recent":      1.0,
+    "established": 0.85,
+    "dated":       0.60,
 }
+_RECENCY_DEFAULT = 0.75   # when recency is unknown for a skill
 
 
-def _normalize_skill(skill: str) -> str:
-    """Lowercase, strip, remove punctuation (keep hyphens)."""
-    s = skill.lower().strip()
-    s = re.sub(r"[^\w\s\-]", "", s)
-    return s
+# ── Embedding cache ────────────────────────────────────────────────────────────
 
-# Common abbreviation aliases — applied to BOTH JD skills and resume skills before matching
-_SKILL_ALIASES = {
-    # ML/AI
-    "ml": "machine learning", "nlp": "natural language processing",
-    "natural language processing": "nlp",  # reverse — normalize to short form for matching
-    "llm": "large language model", "llms": "large language model",
-    "rl": "reinforcement learning", "dl": "deep learning",
-    "genai": "generative ai", "gen ai": "generative ai",
-    "ir": "information retrieval",
-    # Frameworks
-    "tf": "tensorflow", "sklearn": "scikit-learn",
-    "scikit learn": "scikit-learn", "hf": "hugging face",
-    # Cloud
-    "gcp": "google cloud", "aws": "amazon web services",
-    "azure": "microsoft azure", "k8s": "kubernetes",
-    # Data
-    "etl": "data pipeline", "data pipeline": "etl",
-    "mlops": "ml operations", "ml operations": "mlops",
-    "cloud platforms": "cloud", "cloud": "cloud platforms",
-}
-
-def _apply_aliases(skill: str) -> str:
-    return _SKILL_ALIASES.get(skill, skill)
-
-def _skill_matches(jd_skill_norm: str, resume_skills_norm: set[str]) -> bool:
+class _EmbeddingCache:
     """
-    Multi-strategy matching (in order of strictness):
-    1. Exact match after normalization + alias expansion (both sides)
-    2. JD skill contained in resume skill (only if JD skill >= 4 chars)
-    3. Resume skill contained in JD skill (only if resume skill >= 5 chars)
-    4. All significant words (>3 chars) of JD skill appear in a resume skill token
+    Lazy-loads the sentence-transformer model once.
+    Caches encoded skill lists by content hash — JD skills are encoded
+    once per session and reused across all resumes.
     """
-    jd = _apply_aliases(jd_skill_norm)
-    # Build alias-expanded resume set for strategy 1
-    resume_aliased = {_apply_aliases(rs) for rs in resume_skills_norm}
 
-    if jd in resume_skills_norm or jd in resume_aliased:
-        return True
-    for rs in resume_skills_norm:
-        rs_a = _apply_aliases(rs)
-        # Strategy 2: jd skill is a substring of a resume skill token
-        if len(jd) >= 4 and jd in rs_a:
-            return True
-        # Strategy 3: resume skill is a substring of jd skill token
-        if len(rs_a) >= 5 and rs_a in jd:
-            return True
-        # Strategy 4: all significant words of JD skill present in resume skill
-        jd_words = {w for w in jd.split() if len(w) > 3}
-        rs_words = {w for w in rs_a.split() if len(w) > 3}
-        if len(jd_words) >= 2 and jd_words.issubset(rs_words):
-            return True
-    return False
+    def __init__(self) -> None:
+        self._model: Optional[SentenceTransformer] = None
+        # key: hash(tuple(skills)) → np.ndarray of shape (n_skills, embed_dim)
+        self._cache: dict[int, np.ndarray] = {}
 
-def _skill_overlap(jd_skills: list[str], resume_skills: list[str]) -> tuple[list[str], list[str]]:
+    @property
+    def model(self) -> SentenceTransformer:
+        if self._model is None:
+            logger.info(f"Loading embedding model: {config.model.embedding_model}")
+            self._model = SentenceTransformer(
+                config.model.embedding_model,
+                device=config.model.embedding_device,
+            )
+        return self._model
+
+    def get_cached(self, skills: list[str]) -> np.ndarray:
+        """
+        Return embeddings for a skill list, using cache when available.
+        Designed for JD skills — encode once, reuse for every resume.
+        """
+        if not skills:
+            return np.zeros((0, 384))   # bge-small-en-v1.5 dim = 384
+
+        key = hash(tuple(skills))
+        if key not in self._cache:
+            embs = self.model.encode(
+                skills,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+                batch_size=64,
+            )
+            self._cache[key] = embs
+            logger.debug(f"Cached {len(skills)} skill embeddings (key={key})")
+        return self._cache[key]
+
+    def encode(self, skills: list[str]) -> np.ndarray:
+        """
+        Encode without caching — used for per-resume candidate skills.
+        Not cached because each resume has a unique skill set.
+        """
+        if not skills:
+            return np.zeros((0, 384))
+        return self.model.encode(
+            skills,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+            batch_size=64,
+        )
+
+
+# Module-level singleton — shared across all align() calls in a session
+_cache = _EmbeddingCache()
+
+
+# ── Skill matching ─────────────────────────────────────────────────────────────
+
+def _match_skills(
+    jd_skills: list[str],
+    jd_embeddings: np.ndarray,
+    candidate_skills: list[str],
+    candidate_embeddings: np.ndarray,
+    recency_map: dict[str, str],   # lowercased skill → recency string
+) -> tuple[list[str], list[str], float]:
     """
-    Compute matched and missing skills using fuzzy multi-strategy matching.
-    Far more robust than exact match — handles aliases, substrings, and word overlap.
+    For each JD skill, find the best-matching candidate skill via cosine similarity.
+
+    Returns:
+        matched_skills  — JD skills that found a match at or above partial threshold
+        missing_skills  — JD skills with no sufficient match
+        weighted_coverage — float 0→1 accounting for match strength and recency
+
+    Coverage formula per skill:
+        match_weight (1.0 full / 0.6 partial) × recency_weight (0.6–1.0)
+    Total coverage = sum(per-skill scores) / len(jd_skills)
     """
-    resume_norm = {_normalize_skill(s) for s in resume_skills}
-    matched, missing = [], []
-    for jd_skill in jd_skills:
-        jd_norm = _normalize_skill(jd_skill)
-        if _skill_matches(jd_norm, resume_norm):
+    if not jd_skills:
+        return [], [], 1.0   # no requirements → full coverage by definition
+
+    if candidate_skills == [] or candidate_embeddings.size == 0 or jd_embeddings.size == 0:
+        return [], list(jd_skills), 0.0
+
+    # Cosine similarity matrix: (n_jd, n_candidate)
+    # Both embedding matrices are already L2-normalised → dot product = cosine sim
+    sim_matrix: np.ndarray = jd_embeddings @ candidate_embeddings.T
+
+    matched: list[str] = []
+    missing: list[str] = []
+    total_score: float = 0.0
+
+    for i, jd_skill in enumerate(jd_skills):
+        best_idx = int(np.argmax(sim_matrix[i]))
+        best_sim = float(sim_matrix[i, best_idx])
+        best_candidate_skill = candidate_skills[best_idx]
+
+        recency = recency_map.get(best_candidate_skill.lower())
+        recency_weight = (
+            _RECENCY_WEIGHTS.get(recency, _RECENCY_DEFAULT)
+            if recency else _RECENCY_DEFAULT
+        )
+
+        if best_sim >= _FULL_MATCH_THRESHOLD:
             matched.append(jd_skill)
+            total_score += 1.0 * recency_weight
+        elif best_sim >= _PARTIAL_MATCH_THRESHOLD:
+            matched.append(jd_skill)   # still shown as matched in output
+            total_score += _PARTIAL_WEIGHT * recency_weight
         else:
             missing.append(jd_skill)
-    return matched, missing
+
+    coverage = total_score / len(jd_skills)
+    return matched, missing, coverage
 
 
-def _seniority_match_label(jd_level: SeniorityLevel, resume_level: SeniorityLevel) -> str:
-    jd_score = SENIORITY_ORDER.get(jd_level, 2)
-    resume_score = SENIORITY_ORDER.get(resume_level, 2)
-    delta = resume_score - jd_score
+# ── Seniority scoring ──────────────────────────────────────────────────────────
+
+def _compute_seniority(
+    candidate_level: str,
+    required_level: str,
+) -> tuple[str, float]:
+    """
+    Returns (human-readable description, 0→1 score).
+    Scoring is symmetric — being over-qualified is treated similarly to under-qualified
+    (over-qualified candidates are often a flight risk or misaligned on scope).
+    """
+    c = SENIORITY_ORDER.get(candidate_level.lower(), 2)
+    r = SENIORITY_ORDER.get(required_level.lower(), 2)
+    delta = abs(c - r)
+
+    score_map = {0: 1.0, 1: 0.7, 2: 0.4}
+    score = score_map.get(delta, 0.1)
 
     if delta == 0:
-        return "aligned"
-    elif delta > 0:
-        return "overqualified"
-    elif delta == -1:
-        return "slightly underqualified"
+        label = "exact match"
     else:
-        return "underqualified"
+        direction = "above" if c > r else "below"
+        label = f"{delta} level{'s' if delta > 1 else ''} {direction}"
+
+    return label, score
 
 
-def _domain_match_score(jd_domains: list[str], resume_domains: list[str]) -> tuple[list[str], float]:
+# ── YoE scoring ────────────────────────────────────────────────────────────────
+
+def _compute_yoe(
+    candidate_yoe: float,
+    required_yoe: Optional[float],
+) -> tuple[float, float]:
     """
-    Compute domain overlap with fuzzy matching.
-    Handles cases like 'AI' matching 'artificial intelligence', 'fintech' matching 'finance'.
+    Returns (gap_years, 0→1 score).
+
+    If no requirement stated → neutral score of 0.8 (don't penalise or reward).
+    Under-qualified: linear penalty proportional to gap.
+    Over-qualified: slight bonus, capped at 1.0.
+    """
+    if required_yoe is None or required_yoe <= 0:
+        return 0.0, 0.8
+
+    gap = candidate_yoe - required_yoe
+    ratio = candidate_yoe / required_yoe
+
+    if ratio >= 1.0:
+        # Over by up to 100% of requirement → bonus from 0.8 to 1.0
+        score = min(1.0, 0.8 + 0.2 * min(ratio - 1.0, 1.0))
+    else:
+        # Under: linear — 0 YoE scores 0.0, meeting requirement scores 0.8
+        score = ratio * 0.8
+
+    return gap, score
+
+
+# ── Domain scoring ─────────────────────────────────────────────────────────────
+
+def _compute_domain_overlap(
+    candidate_domains: list[str],
+    jd_domains: list[str],
+) -> float:
+    """
+    Simple case-insensitive overlap ratio.
+    Returns neutral 0.8 if no JD domain preference stated.
     """
     if not jd_domains:
-        return [], 1.0  # No domain requirement = full score
-    if not resume_domains:
-        return [], 0.0
+        return 0.8
 
-    # Domain synonym expansions
-    _DOMAIN_ALIASES = {
-        "ai": ["artificial intelligence", "machine learning", "ml"],
-        "ml": ["machine learning", "artificial intelligence", "ai"],
-        "nlp": ["natural language processing", "language models"],
-        "fintech": ["finance", "financial", "banking", "payments"],
-        "healthtech": ["healthcare", "health", "medical", "clinical"],
-        "e-commerce": ["ecommerce", "retail", "marketplace"],
-        "b2b saas": ["saas", "enterprise software", "b2b"],
-    }
-
-    jd_norm = [d.lower().strip() for d in jd_domains]
-    resume_norm = [d.lower().strip() for d in resume_domains]
-    resume_text = " ".join(resume_norm)  # for substring search
-
-    matched = []
-    for jd_d in jd_norm:
-        hit = False
-        # Exact match
-        if jd_d in resume_norm:
-            hit = True
-        # Substring: "fintech" matches "financial technology" or vice versa
-        elif any(jd_d in r or r in jd_d for r in resume_norm):
-            hit = True
-        # Word overlap: "machine learning" matches resume domain "ml engineering"
-        elif any(w in resume_text for w in jd_d.split() if len(w) > 3):
-            hit = True
-        # Alias expansion
-        elif jd_d in _DOMAIN_ALIASES and any(
-            alias in resume_text for alias in _DOMAIN_ALIASES[jd_d]
-        ):
-            hit = True
-        if hit:
-            matched.append(jd_d)
-
-    score = len(matched) / len(jd_norm)
-    return matched, min(score, 1.0)
+    candidate_set = {d.lower().strip() for d in candidate_domains}
+    jd_set = {d.lower().strip() for d in jd_domains}
+    overlap = len(candidate_set & jd_set) / len(jd_set)
+    return overlap
 
 
-def _candidate_quality_score(resume: ResumeExtracted) -> float:
+# ── Quality signals ────────────────────────────────────────────────────────────
+
+def _compute_quality(
+    resume: ResumeProfile,
+) -> tuple[float, float, float, list[str], list[str]]:
     """
-    Composite quality score from impact + specificity + project signals.
-    Range: 0.0 - 1.0
+    Returns:
+        depth_score      — 0→1 from skill_depth_signals (3+ = full)
+        red_flag_penalty — 0→0.4 capped (each red flag costs 0.1)
+        bonus            — 0→0.3 capped (publications, open source, certs)
+        bonus_signals    — human-readable list for display
+        penalty_signals  — human-readable list for display (the red flags)
+
+    These are the extraction signals that went completely unused in the
+    original scoring layer. Now they directly affect the quality component.
     """
-    # Impact quality
-    impact_score = (
-        0.5 * resume.quantified_impact_ratio +
-        0.3 * resume.specificity_score +
-        0.2 * (1.0 - resume.exaggeration_index)
-    )
+    # Depth: skill_depth_signals are mastery-evidence strings like
+    # "PyTorch: fine-tuned 13B model with FSDP" — 3+ is a strong signal
+    n_depth = len(resume.skills.skill_depth_signals)
+    depth_score = min(1.0, n_depth / 3.0)
 
-    # Project quality — use skill depth signals as proxy
-    depth_signals = len(resume.skills.skill_depth_signals) if hasattr(resume, 'skills') else 0
-    project_score = min(1.0, 0.3 + depth_signals * 0.15)  # 0.3 base, up to 1.0 with depth signals
+    # Penalty from red flags surfaced by the LLM synthesizer
+    penalty_signals = [f for f in resume.red_flags if f]
+    red_flag_penalty = min(0.4, len(penalty_signals) * 0.1)
 
-    
-    quality = (
-        0.50 * impact_score +
-        0.30 * project_score +
-        0.20 * trajectory_score
-    )
-    return round(min(quality, 1.0), 3)
+    # Bonus from concrete credentials
+    bonus_signals: list[str] = []
+    bonus = 0.0
 
-
-def _semantic_similarity(jd: JDProfile, resume: ResumeExtracted, model: SentenceTransformer) -> float:
-    """
-    Compute semantic similarity between JD persona description and resume narrative.
-    Also includes skill-level semantic matching for implicit skill coverage.
-    """
-    # Text representations for embedding
-    jd_text = (
-        f"{jd.role_identity.job_title}. {jd.ideal_candidate_persona}. "
-        f"Required: {', '.join(jd.hard_requirements.required_skills)}. "
-        f"Preferred: {', '.join(jd.soft_requirements.preferred_skills[:5])}"
-    )
-    resume_text = (
-        f"{resume.identity.current_title or ''}. {resume.career_narrative}. "
-        f"Skills: {', '.join(resume.explicit_skills + resume.implicit_skills[:10])}. "
-        f"Archetype: {resume.career_archetype}"
-    )
-
-    jd_emb = model.encode(jd_text, convert_to_tensor=True)
-    resume_emb = model.encode(resume_text, convert_to_tensor=True)
-    similarity = float(util.cos_sim(jd_emb, resume_emb))
-
-    # Normalize from [-1,1] to [0,1]
-    return round((similarity + 1) / 2, 3)
-
-
-def _compute_bonus_signals(jd: JDProfile, resume: ResumeExtracted) -> list[str]:
-    signals = []
-    if resume.has_open_source:
-        signals.append("Has open source contributions")
-    if resume.has_publications:
-        signals.append("Has publications / research output")
-    if resume.highest_company_tier == CompanyTier.TIER_1:
-        signals.append("Tier-1 company experience")
-    if resume.has_leadership_experience:
-        signals.append("Leadership experience")
-
-    # Rare/niche skills the JD didn't explicitly ask for but are relevant
-    all_jd_skills_norm = {_normalize_skill(s) for s in jd.hard_requirements.required_skills + jd.soft_requirements.preferred_skills}
-    all_resume_skills_norm = {_normalize_skill(s) for s in resume.explicit_skills + resume.implicit_skills}
-    extra_skills = all_resume_skills_norm - all_jd_skills_norm
-    if len(extra_skills) > 3:
-        signals.append(f"Additional relevant skills: {', '.join(list(extra_skills)[:4])}")
-
-    return signals
-
-
-# ── Load embedding model once ──────────────────────────────────────────────────
-_embedding_model: SentenceTransformer | None = None
-
-def _get_embedding_model() -> SentenceTransformer:
-    global _embedding_model
-    if _embedding_model is None:
-        logger.info(f"Loading embedding model: {config.model.embedding_model}")
-        _embedding_model = SentenceTransformer(
-            config.model.embedding_model,
-            device=config.model.embedding_device
+    if resume.education.has_publications:
+        bonus += 0.3
+        pub_count = len(resume.education.publications)
+        bonus_signals.append(
+            f"{pub_count} publication{'s' if pub_count != 1 else ''}"
         )
-    return _embedding_model
+
+    if resume.education.has_open_source:
+        bonus += 0.3
+        bonus_signals.append("open source contributions")
+
+    if resume.education.certifications:
+        bonus += 0.2
+        certs = resume.education.certifications
+        bonus_signals.append(
+            f"certifications: {', '.join(certs[:2])}{'...' if len(certs) > 2 else ''}"
+        )
+
+    bonus = min(0.3, bonus)   # cap so credentials don't dominate
+
+    return depth_score, red_flag_penalty, bonus, bonus_signals, penalty_signals
 
 
 # ── Main alignment function ────────────────────────────────────────────────────
 
-def align(jd: JDProfile, resume: ResumeExtracted) -> AlignmentResult:
+def align(jd: JDProfile, resume: ResumeProfile) -> AlignmentResult:
     """
-    Produce a structured alignment object comparing a resume against a JD.
+    Compute full alignment between a JD and a resume.
 
-    This is fully deterministic — no LLM calls.
+    JD skill embeddings are cached — encoded once per unique skill list,
+    reused across all resumes in the same session.
+
+    Args:
+        jd:     Extracted JD profile (frozen extraction layer output).
+        resume: Extracted resume profile (frozen extraction layer output).
+
+    Returns:
+        AlignmentResult with all raw signals. Weights are applied in scorer.py.
     """
-    logger.info(f"Aligning resume for: {resume.candidate_name or 'Unknown'}")
-    model = _get_embedding_model()
 
-    # All candidate skills (explicit + implicit)
-    all_resume_skills = resume.explicit_skills + resume.implicit_skills
+    # ── Skill alignment ────────────────────────────────────────────────────────
+    required_skills  = jd.hard_requirements.required_skills
+    preferred_skills = jd.soft_requirements.preferred_skills
 
-    # Skill alignment
-    matched_req, missing_req = _skill_overlap(jd.hard_requirements.required_skills, all_resume_skills)
-    matched_pref, _ = _skill_overlap(jd.soft_requirements.preferred_skills, all_resume_skills)
+    # Deduplicate candidate skills, preserving insertion order
+    # explicit first (listed), then implicit (demonstrated)
+    seen: set[str] = set()
+    candidate_skills: list[str] = []
+    for s in (resume.skills.explicit_skills + resume.skills.implicit_skills):
+        if s.lower() not in seen:
+            seen.add(s.lower())
+            candidate_skills.append(s)
 
-    skill_coverage_required = len(matched_req) / len(jd.hard_requirements.required_skills) if jd.hard_requirements.required_skills else 1.0
-    skill_coverage_preferred = len(matched_pref) / len(jd.soft_requirements.preferred_skills) if jd.soft_requirements.preferred_skills else 0.0
+    recency_map = {k.lower(): v for k, v in resume.skills.skill_recency_map.items()}
 
-    # Experience alignment
-    required_yoe = jd.hard_requirements.required_years_of_experience or 0.0
-    exp_gap = round(resume.total_years_experience - required_yoe, 1)
-    seniority_match = _seniority_match_label(jd.role_identity.seniority_level, resume.current_seniority)
+    # JD embeddings are cached — same required/preferred skills → same embedding
+    req_embs  = _cache.get_cached(required_skills)
+    pref_embs = _cache.get_cached(preferred_skills)
 
-    # Domain alignment
-    domain_overlap, domain_match_score = _domain_match_score(
-        jd.hard_requirements.required_domain_experience, resume.domains_worked_in
+    # Candidate embeddings are NOT cached (unique per resume)
+    candidate_embs = _cache.encode(candidate_skills)
+
+    matched_req, missing_req, req_coverage = _match_skills(
+        required_skills, req_embs,
+        candidate_skills, candidate_embs,
+        recency_map,
+    )
+    matched_pref, _, pref_coverage = _match_skills(
+        preferred_skills, pref_embs,
+        candidate_skills, candidate_embs,
+        recency_map,
     )
 
-    # Character alignment
-    # ownership_style: compare JD expectation vs candidate's most recent role seniority
-    # IC_OWNER/TECH_LEAD JDs want senior+ ICs; MANAGER JDs want people managers
-    from src.extraction.jd_extraction.schemas import OwnershipStyle
-    jd_ownership = jd.role_character.ownership_style
-    # most_recent_seniority = resume.work_experiences[0].seniority_at_role if resume.work_experiences else None
-    manager_jd = jd_ownership in (OwnershipStyle.MANAGER, OwnershipStyle.PLAYER_COACH)
-    candidate_is_manager = resume.work_history.has_people_management
-    ownership_style_match = (manager_jd == candidate_is_manager) or jd_ownership == OwnershipStyle.UNKNOWN
+    # Preferred skills give a bonus capped at +0.1 on top of required coverage
+    skill_score = min(1.0, req_coverage + 0.1 * pref_coverage)
 
-    work_style_match = True  # Placeholder — extend from WorkStyle enum comparison
+    # ── Experience alignment ───────────────────────────────────────────────────
+    gap_years, yoe_sc = _compute_yoe(
+        resume.total_years_experience,
+        jd.hard_requirements.required_years_of_experience,
+    )
+    seniority_label, sen_sc = _compute_seniority(
+        resume.current_seniority.value,
+        jd.role_identity.seniority_level.value,
+    )
 
-    # Semantic similarity
-    semantic_sim = _semantic_similarity(jd, resume, model)
+    # Use JD's preferred domain experience as the domain target
+    # (this is where domain signals live in the JD schema)
+    jd_domains = jd.soft_requirements.preferred_domain_experience
+    dom_sc = _compute_domain_overlap(resume.domains_worked_in, jd_domains)
 
-    # Quality score
-    quality_score = _candidate_quality_score(resume)
+    experience_score = 0.5 * yoe_sc + 0.3 * sen_sc + 0.2 * dom_sc
 
-    # Bonus + penalty
-    bonus = _compute_bonus_signals(jd, resume)
+    # ── Quality signals ────────────────────────────────────────────────────────
+    depth_score, red_flag_penalty, bonus, bonus_signals, penalty_signals = _compute_quality(resume)
+
+    quality_score = min(1.0, (depth_score + bonus) * (1.0 - red_flag_penalty))
+
+    logger.debug(
+        f"{resume.identity.full_name or 'Unknown'}: "
+        f"skill={skill_score:.3f} exp={experience_score:.3f} qual={quality_score:.3f} "
+        f"req_cov={req_coverage:.2%} gap={gap_years:+.1f}yr seniority={seniority_label}"
+    )
 
     return AlignmentResult(
         matched_required_skills=matched_req,
         missing_required_skills=missing_req,
         matched_preferred_skills=matched_pref,
-        skill_coverage_required=round(skill_coverage_required, 3),
-        skill_coverage_preferred=round(skill_coverage_preferred, 3),
-        experience_gap_years=exp_gap,
-        seniority_match=seniority_match,
-        domain_overlap=domain_overlap,
-        domain_match_score=round(domain_match_score, 3),
-        ownership_style_match=ownership_style_match,
-        work_style_match=work_style_match,
-        semantic_similarity_score=semantic_sim,
-        candidate_quality_score=quality_score,
-        bonus_signals=bonus,
-        highest_company_tier=resume.highest_company_tier.value if resume.highest_company_tier else None,
+        required_skill_coverage=req_coverage,
+        preferred_skill_coverage=pref_coverage,
+        experience_gap_years=gap_years,
+        yoe_score=yoe_sc,
+        seniority_match=seniority_label,
+        seniority_score=sen_sc,
+        domain_overlap_score=dom_sc,
+        depth_score=depth_score,
+        red_flag_penalty=red_flag_penalty,
+        bonus=bonus,
+        bonus_signals=bonus_signals,
+        penalty_signals=penalty_signals,
+        skill_score=skill_score,
+        experience_score=experience_score,
+        quality_score=quality_score,
     )
