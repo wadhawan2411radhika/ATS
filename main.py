@@ -66,7 +66,7 @@ def print_results_table(results) -> None:
         print(f"    Preferred skills matched: {', '.join(b.matched_preferred_skills) or 'None'}")
         print(f"    Experience gap          : {b.experience_gap_years:+.1f} years")
         print(f"    Seniority               : {b.seniority_match}")
-        print(f"    Tier scores             : T1={b.tier1_score:.2f} | T2={b.tier2_score:.2f} | T3={b.tier3_score:.2f} | T4={b.tier4_score:.2f}")
+        print(f"    Tier scores             : T1={b.tier1_score:.2f} | T2={b.tier2_score:.2f} | T3={b.tier3_score:.2f}")
         if b.bonus_signals:
             print(f"    ✓ Bonus : {', '.join(b.bonus_signals)}")
         if b.penalty_signals:

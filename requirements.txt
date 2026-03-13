@@ -1,6 +1,6 @@
 # LLM & AI
 openai>=1.30.0
-sentence-transformers>=3.0.0
+# sentence-transformers removed — skill matching now uses LLM structured output
 
 # File parsing
 pdfplumber>=0.11.0
