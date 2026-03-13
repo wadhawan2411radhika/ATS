@@ -48,8 +48,6 @@ def _synthesize(
     class SynthMeta(BaseModel):
         ideal_candidate_persona: str
         role_in_one_line: str
-        # extraction_confidence: float
-        # extraction_notes: list[str]
 
     system = """
 Synthesize the final summary fields for a JD extraction.
@@ -75,14 +73,8 @@ JD excerpt: {jd_text[:600]}
         soft_requirements=soft_requirements,
         role_character=role_character,
         ideal_candidate_persona=meta.ideal_candidate_persona,
-        role_in_one_line=meta.role_in_one_line,
-        # extraction_confidence=meta.extraction_confidence,
-        # extraction_notes=meta.extraction_notes,
+        role_in_one_line=meta.role_in_one_line
     )
-
-# extraction_confidence: 0.0-1.0. How complete and unambiguous was the JD?
-#   1.0 = detailed and specific. 0.5 = vague in places. 0.2 = very sparse.
-# extraction_notes: List any ambiguities or low-confidence fields.
 
 # ── Safe tool runner ───────────────────────────────────────────────────────────
 
@@ -146,6 +138,5 @@ def extract_jd(jd_text: str) -> JDProfile:
         f"JD extracted: '{profile.role_identity.job_title}' | "
         f"Seniority: {profile.role_identity.seniority_level} | "
         f"Required skills: {len(profile.hard_requirements.required_skills)} | "
-        # f"Confidence: {profile.extraction_confidence:.2f}"
     )
     return profile
