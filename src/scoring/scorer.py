@@ -29,14 +29,13 @@ import logging
 
 from src.extraction.jd_extraction.schemas import JDProfile
 from src.extraction.resume_extraction.schemas import ResumeProfile
-from src.scoring.schemas import AlignmentResult, ScoringBreakdown   # noqa: F401 — ScoringBreakdown re-exported
+from src.scoring.schemas import AlignmentResult, ScoringBreakdown   
 from config import config
 
 logger = logging.getLogger(__name__)
 
-# ── Weights ───────────────────────────────────────────────────────────────────
+# ── Weights ────────────────────────────────────────────────────────────────────
 # In production these would be learned from recruiter feedback data.
-# All tunable from config.py without touching this file.
 
 _SKILL_WEIGHT      = 0.55
 _EXPERIENCE_WEIGHT = 0.25
@@ -56,13 +55,9 @@ def score(
     """
     Apply weights and gate checks to produce the final ScoringBreakdown.
 
-    Gate logic (score = 0.0 immediately if failed — no further processing):
-        1. Required skill coverage < config.gate.min_required_skill_coverage
-           Default: 25% — a candidate matching fewer than 1-in-4 required skills
-           is not worth ranking.
+    Gate logic (score = 0.0 immediately if failed):
+        1. Required skill coverage < config.gate.min_required_skill_coverage (default 25%)
         2. Candidate YoE < 50% of required YoE
-           A candidate with half the required experience is a hard mismatch
-           for most roles, regardless of other signals.
 
     Args:
         jd:        Extracted JD profile.
@@ -73,6 +68,7 @@ def score(
         ScoringBreakdown with final_score in [0.0, 1.0] and full explainability.
     """
     required_yoe = jd.hard_requirements.required_years_of_experience
+    candidate_name = resume.candidate_name  # may be None if extraction missed it
 
     # ── Gate 1: skill coverage ─────────────────────────────────────────────────
     if (
@@ -83,8 +79,8 @@ def score(
             f"Skill coverage {alignment.required_skill_coverage:.0%} is below "
             f"the minimum threshold of {config.gate.min_required_skill_coverage:.0%}"
         )
-        logger.debug(f"Gate FAILED (skill): {reason}")
-        return _gated_out(alignment, reason)
+        logger.debug(f"Gate FAILED (skill): {candidate_name or 'Unknown'} — {reason}")
+        return _gated_out(candidate_name, alignment, reason)
 
     # ── Gate 2: experience floor ───────────────────────────────────────────────
     if (
@@ -97,8 +93,8 @@ def score(
             f"Candidate YoE ({resume.total_years_experience:.1f}y) is less than 50% "
             f"of required ({required_yoe:.1f}y)"
         )
-        logger.debug(f"Gate FAILED (YoE): {reason}")
-        return _gated_out(alignment, reason)
+        logger.debug(f"Gate FAILED (YoE): {candidate_name or 'Unknown'} — {reason}")
+        return _gated_out(candidate_name, alignment, reason)
 
     # ── Weighted final score ───────────────────────────────────────────────────
     raw = (
@@ -109,13 +105,14 @@ def score(
     final = round(min(1.0, max(0.0, raw)), 4)
 
     logger.debug(
-        f"Score: {final:.4f} "
+        f"Score: {candidate_name or 'Unknown'} → {final:.4f} "
         f"(T1={alignment.skill_score:.3f} × {_SKILL_WEIGHT} + "
         f"T2={alignment.experience_score:.3f} × {_EXPERIENCE_WEIGHT} + "
         f"T3={alignment.quality_score:.3f} × {_QUALITY_WEIGHT})"
     )
 
     return ScoringBreakdown(
+        candidate_name=candidate_name,
         passed_gate=True,
         gate_failure_reason=None,
         matched_required_skills=alignment.matched_required_skills,
@@ -126,7 +123,6 @@ def score(
         tier1_score=round(alignment.skill_score, 4),
         tier2_score=round(alignment.experience_score, 4),
         tier3_score=round(alignment.quality_score, 4),
-        tier4_score=0.0,
         bonus_signals=alignment.bonus_signals,
         penalty_signals=alignment.penalty_signals,
         final_score=final,
@@ -135,13 +131,18 @@ def score(
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
-def _gated_out(alignment: AlignmentResult, reason: str) -> ScoringBreakdown:
+def _gated_out(
+    candidate_name: str | None,
+    alignment: AlignmentResult,
+    reason: str,
+) -> ScoringBreakdown:
     """
-    Return a zero-score breakdown for a candidate that failed a gate check.
-    Preserves matched/missing skills and seniority for the display table —
-    useful for the recruiter to understand *why* the candidate was filtered.
+    Zero-score breakdown for a candidate that failed a gate check.
+    Preserves matched/missing skills and seniority for the display table
+    so the recruiter can see *why* the candidate was filtered.
     """
     return ScoringBreakdown(
+        candidate_name=candidate_name,
         passed_gate=False,
         gate_failure_reason=reason,
         matched_required_skills=alignment.matched_required_skills,
@@ -152,7 +153,6 @@ def _gated_out(alignment: AlignmentResult, reason: str) -> ScoringBreakdown:
         tier1_score=0.0,
         tier2_score=0.0,
         tier3_score=0.0,
-        tier4_score=0.0,
         bonus_signals=[],
         penalty_signals=alignment.penalty_signals,
         final_score=0.0,

@@ -23,8 +23,8 @@ class AlignmentResult:
     matched_required_skills: list[str]       # JD required skills that matched
     missing_required_skills: list[str]       # JD required skills with no match
     matched_preferred_skills: list[str]      # JD preferred skills that matched
-    required_skill_coverage: float           # 0→1, recency-weighted coverage of required skills
-    preferred_skill_coverage: float          # 0→1, recency-weighted coverage of preferred skills
+    required_skill_coverage: float           # 0→1, weighted coverage of required skills
+    preferred_skill_coverage: float          # 0→1, weighted coverage of preferred skills
 
     # ── Experience alignment ───────────────────────────────────────────────────
     experience_gap_years: float              # candidate_yoe - required_yoe (negative = under)
@@ -34,7 +34,7 @@ class AlignmentResult:
     domain_overlap_score: float              # 0→1 overlap of candidate domains vs JD domains
 
     # ── Quality signals ────────────────────────────────────────────────────────
-    depth_score: float                       # 0→1 from skill_depth_signals (mastery evidence)
+    depth_score: float                       # 0→1 from explicit + implicit depth signals
     red_flag_penalty: float                  # 0→0.4 penalty from red_flags
     bonus: float                             # 0→0.3 from publications, OSS, certifications
     bonus_signals: list[str]                 # human-readable bonus descriptions
@@ -58,6 +58,9 @@ class ScoringBreakdown:
         tier4 → 0.0                (no separate tier; bonus folded into quality)
     """
 
+    # ── Identity ───────────────────────────────────────────────────────────────
+    candidate_name: Optional[str] #TODO: replace with file name           # Surfaced in results.json output
+
     # ── Gate ──────────────────────────────────────────────────────────────────
     passed_gate: bool
     gate_failure_reason: Optional[str]
@@ -75,7 +78,6 @@ class ScoringBreakdown:
     tier1_score: float   # skill
     tier2_score: float   # experience
     tier3_score: float   # quality
-    tier4_score: float   # always 0.0
 
     # ── Bonus / penalty labels ─────────────────────────────────────────────────
     bonus_signals: list[str]
