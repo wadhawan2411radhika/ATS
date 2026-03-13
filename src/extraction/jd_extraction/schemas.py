@@ -141,16 +141,4 @@ class JDProfile(BaseModel):
         description="One sentence that captures the essence of the role for a candidate. "
                     "e.g. 'Lead the design and scaling of our fraud detection platform as the senior IC owner on a 6-person ML team.'"
     )
-    # extraction_confidence: float = Field(
-    #     ge=0.0, le=1.0,
-    #     description=(
-    #         "Agent's self-assessed confidence in the extraction quality. "
-    #         "1.0 = JD was detailed and unambiguous. "
-    #         "0.5 = JD had vague language or missing sections. "
-    #         "0.2 = JD was extremely sparse or poorly written."
-    #     )
-    # )
-    # extraction_notes: list[str] = Field(
-    #     default_factory=list,
-    #     description="Any caveats, ambiguities, or low-confidence extractions the agent wants to flag."
-    # )
+    

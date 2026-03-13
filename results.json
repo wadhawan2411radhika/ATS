@@ -1,0 +1,466 @@
+{
+  "ranked_results": [
+    {
+      "candidate_name": "Arjun Mehta",
+      "passed_gate": true,
+      "gate_failure_reason": null,
+      "matched_required_skills": [
+        "machine learning",
+        "Python",
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "agent-based systems",
+        "data processing",
+        "SQL",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "software development"
+      ],
+      "missing_required_skills": [
+        "reinforcement learning",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [
+        "TensorFlow",
+        "PyTorch",
+        "SQL",
+        "ETL",
+        "data warehousing",
+        "GCP",
+        "MLOps"
+      ],
+      "experience_gap_years": 0.0,
+      "seniority_match": "1 level below",
+      "tier1_score": 0.911,
+      "tier2_score": 0.66,
+      "tier3_score": 1.0,
+      "bonus_signals": [
+        "2 publications"
+      ],
+      "penalty_signals": [],
+      "final_score": 0.8661,
+      "explanation": {
+        "headline": "Strong technical fit for ML lead, but lacks reinforcement learning and is slightly junior on seniority.",
+        "why_strong": [
+          "Excellent match on core ML, Python, and deep learning frameworks (TensorFlow, PyTorch).",
+          "Hands-on experience with large-scale data systems and MLOps, aligning with our stack.",
+          "Demonstrated quality through publications and high skills/quality scores."
+        ],
+        "why_weak": [
+          "Missing reinforcement learning, which is a required skill for the role.",
+          "No explicit evidence of data structures and algorithms expertise.",
+          "Seniority is one level below target, which may impact leadership readiness."
+        ],
+        "interview_focus": [
+          "Probe depth in data structures and algorithms to assess foundational CS knowledge.",
+          "Assess familiarity and practical experience with reinforcement learning.",
+          "Evaluate leadership experience and readiness to step into a lead role."
+        ],
+        "recommendation": "Lean Yes"
+      }
+    },
+    {
+      "candidate_name": "Dr. Priya Venkataraman",
+      "passed_gate": true,
+      "gate_failure_reason": null,
+      "matched_required_skills": [
+        "machine learning",
+        "Python",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data processing",
+        "SQL",
+        "large-scale data systems",
+        "software development",
+        "data structures",
+        "algorithms"
+      ],
+      "missing_required_skills": [
+        "TensorFlow",
+        "ETL",
+        "data warehousing"
+      ],
+      "matched_preferred_skills": [
+        "PyTorch",
+        "SQL",
+        "GCP",
+        "MLOps"
+      ],
+      "experience_gap_years": 0.0,
+      "seniority_match": "2 levels below",
+      "tier1_score": 0.8735,
+      "tier2_score": 0.62,
+      "tier3_score": 1.0,
+      "bonus_signals": [
+        "6 publications"
+      ],
+      "penalty_signals": [
+        "Limited industry experience (primarily academic trajectory)",
+        "Only 1.5 years of post-PhD experience"
+      ],
+      "final_score": 0.8354,
+      "explanation": {
+        "headline": "Strong technical skills in ML, but lacks seniority and industry depth for a lead role.",
+        "why_strong": [
+          "Excellent match on core machine learning and software development skills, including PyTorch and NLP.",
+          "Demonstrated research ability with 6 publications, indicating strong technical depth.",
+          "Solid quality score and familiarity with large-scale data systems and MLOps."
+        ],
+        "why_weak": [
+          "Seniority is two levels below the lead requirement, raising concerns about leadership and team management experience.",
+          "Limited industry experience, with only 1.5 years post-PhD and primarily academic background.",
+          "Missing some required skills (TensorFlow, ETL, data warehousing) relevant for production environments."
+        ],
+        "interview_focus": [
+          "Probe for leadership and team management experience in both academic and industry settings.",
+          "Assess ability to translate research and academic work into production-grade systems.",
+          "Test practical knowledge of TensorFlow, ETL, and data warehousing, and willingness to ramp up quickly."
+        ],
+        "recommendation": "Maybe"
+      }
+    },
+    {
+      "candidate_name": "Marcus Chen",
+      "passed_gate": true,
+      "gate_failure_reason": null,
+      "matched_required_skills": [
+        "Python",
+        "PyTorch",
+        "data processing",
+        "SQL",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "software development"
+      ],
+      "missing_required_skills": [
+        "machine learning",
+        "TensorFlow",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [
+        "PyTorch",
+        "SQL",
+        "ETL",
+        "data warehousing",
+        "GCP",
+        "MLOps"
+      ],
+      "experience_gap_years": 0.0,
+      "seniority_match": "1 level below",
+      "tier1_score": 0.5456,
+      "tier2_score": 0.61,
+      "tier3_score": 1.0,
+      "bonus_signals": [
+        "certifications: Certified Kubernetes Administrator (CKA), AWS Certified DevOps Engineer \u2013 Professional..."
+      ],
+      "penalty_signals": [
+        "No evidence of open source contributions or publications",
+        "No explicit leadership or team management experience mentioned"
+      ],
+      "final_score": 0.6526,
+      "explanation": {
+        "headline": "Solid data engineering background but lacks core machine learning and leadership experience for this lead ML role.",
+        "why_strong": [
+          "Strong skills in Python, PyTorch, SQL, ETL, and large-scale data systems align with the data engineering aspects of the role.",
+          "Relevant certifications (CKA, AWS DevOps) demonstrate technical depth and commitment to professional development.",
+          "High quality score suggests strong execution and reliability in previous roles."
+        ],
+        "why_weak": [
+          "Missing key machine learning skills (TensorFlow, NLP, retrieval/ranking systems, reinforcement learning) required for the role.",
+          "No explicit experience with data structures and algorithms, which are foundational for ML leadership.",
+          "Seniority is one level below requirement and lacks clear evidence of leadership or team management experience."
+        ],
+        "interview_focus": [
+          "Probe for hands-on experience with machine learning models, especially TensorFlow and NLP.",
+          "Assess understanding of data structures, algorithms, and their application in ML systems.",
+          "Explore any informal or unlisted leadership experience, including mentoring, project ownership, or team coordination."
+        ],
+        "recommendation": "Lean No"
+      }
+    },
+    {
+      "candidate_name": "Sneha Iyer",
+      "passed_gate": false,
+      "gate_failure_reason": "Skill coverage 35% is below the minimum threshold of 40%",
+      "matched_required_skills": [
+        "machine learning",
+        "Python",
+        "data processing",
+        "SQL",
+        "ETL",
+        "data warehousing"
+      ],
+      "missing_required_skills": [
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "large-scale data systems",
+        "software development",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [],
+      "experience_gap_years": 0.0,
+      "seniority_match": "1 level below",
+      "tier1_score": 0.0,
+      "tier2_score": 0.0,
+      "tier3_score": 0.0,
+      "bonus_signals": [],
+      "penalty_signals": [
+        "Limited exposure to advanced NLP or LLMs (currently basic/intermediate)"
+      ],
+      "final_score": 0.0,
+      "explanation": null
+    },
+    {
+      "candidate_name": "Alex Sharma",
+      "passed_gate": false,
+      "gate_failure_reason": "Skill coverage 18% is below the minimum threshold of 40%",
+      "matched_required_skills": [
+        "Python",
+        "SQL",
+        "software development"
+      ],
+      "missing_required_skills": [
+        "machine learning",
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data processing",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [],
+      "experience_gap_years": 0.0,
+      "seniority_match": "2 levels below",
+      "tier1_score": 0.0,
+      "tier2_score": 0.0,
+      "tier3_score": 0.0,
+      "bonus_signals": [],
+      "penalty_signals": [
+        "Limited information on leadership or mentorship roles"
+      ],
+      "final_score": 0.0,
+      "explanation": null
+    },
+    {
+      "candidate_name": "Alex Sharma",
+      "passed_gate": false,
+      "gate_failure_reason": "Skill coverage 6% is below the minimum threshold of 40%",
+      "matched_required_skills": [
+        "software development"
+      ],
+      "missing_required_skills": [
+        "machine learning",
+        "Python",
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data processing",
+        "SQL",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [],
+      "experience_gap_years": 0.0,
+      "seniority_match": "2 levels below",
+      "tier1_score": 0.0,
+      "tier2_score": 0.0,
+      "tier3_score": 0.0,
+      "bonus_signals": [],
+      "penalty_signals": [
+        "No explicit leadership or mentorship experience mentioned",
+        "Limited information on breadth of project ownership or end-to-end delivery"
+      ],
+      "final_score": 0.0,
+      "explanation": null
+    },
+    {
+      "candidate_name": "Alex Sharma",
+      "passed_gate": false,
+      "gate_failure_reason": "Skill coverage 12% is below the minimum threshold of 40%",
+      "matched_required_skills": [
+        "Python",
+        "SQL"
+      ],
+      "missing_required_skills": [
+        "machine learning",
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data processing",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "software development",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [],
+      "experience_gap_years": 0.0,
+      "seniority_match": "1 level below",
+      "tier1_score": 0.0,
+      "tier2_score": 0.0,
+      "tier3_score": 0.0,
+      "bonus_signals": [],
+      "penalty_signals": [
+        "No formal education listed",
+        "Relatively short total experience for 'senior' title"
+      ],
+      "final_score": 0.0,
+      "explanation": null
+    },
+    {
+      "candidate_name": "Jake Thompson",
+      "passed_gate": false,
+      "gate_failure_reason": "Skill coverage 18% is below the minimum threshold of 40%",
+      "matched_required_skills": [
+        "Python",
+        "SQL",
+        "software development"
+      ],
+      "missing_required_skills": [
+        "machine learning",
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data processing",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [],
+      "experience_gap_years": 0.0,
+      "seniority_match": "1 level below",
+      "tier1_score": 0.0,
+      "tier2_score": 0.0,
+      "tier3_score": 0.0,
+      "bonus_signals": [],
+      "penalty_signals": [
+        "Highest company tier is TIER_4 (may indicate less exposure to top-tier engineering environments)"
+      ],
+      "final_score": 0.0,
+      "explanation": null
+    },
+    {
+      "candidate_name": "Alex Sharma",
+      "passed_gate": false,
+      "gate_failure_reason": "Skill coverage 6% is below the minimum threshold of 40%",
+      "matched_required_skills": [
+        "SQL"
+      ],
+      "missing_required_skills": [
+        "machine learning",
+        "Python",
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data processing",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "software development",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [],
+      "experience_gap_years": 0.0,
+      "seniority_match": "2 levels below",
+      "tier1_score": 0.0,
+      "tier2_score": 0.0,
+      "tier3_score": 0.0,
+      "bonus_signals": [],
+      "penalty_signals": [
+        "Resume excerpt is incomplete, limiting full assessment"
+      ],
+      "final_score": 0.0,
+      "explanation": null
+    },
+    {
+      "candidate_name": "Alex Sharma",
+      "passed_gate": false,
+      "gate_failure_reason": "Skill coverage 0% is below the minimum threshold of 40%",
+      "matched_required_skills": [],
+      "missing_required_skills": [
+        "machine learning",
+        "Python",
+        "TensorFlow",
+        "PyTorch",
+        "natural language processing",
+        "retrieval systems",
+        "ranking systems",
+        "reinforcement learning",
+        "agent-based systems",
+        "data processing",
+        "SQL",
+        "ETL",
+        "data warehousing",
+        "large-scale data systems",
+        "software development",
+        "data structures",
+        "algorithms"
+      ],
+      "matched_preferred_skills": [],
+      "experience_gap_years": 0.0,
+      "seniority_match": "1 level below",
+      "tier1_score": 0.0,
+      "tier2_score": 0.0,
+      "tier3_score": 0.0,
+      "bonus_signals": [],
+      "penalty_signals": [
+        "No education information provided",
+        "Resume excerpt is incomplete (truncated experience section)"
+      ],
+      "final_score": 0.0,
+      "explanation": null
+    }
+  ]
+}

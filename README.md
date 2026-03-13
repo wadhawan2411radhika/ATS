@@ -62,8 +62,8 @@ Each resume is parsed into a `ResumeProfile` via five focused LLM calls running 
 A synthesis call produces `career_archetype`, `career_narrative`, `green_flags`, and `red_flags`.
 
 ### Stage 3 — Alignment Engine
-Deterministic (no LLM). Computes all raw signals needed for scoring:
-- Semantic skill matching via `sentence-transformers` embeddings
+One LLM call per resume + deterministic signal computation. Produces all raw signals needed for scoring:
+- **Skill matching via LLM**: a single structured LLM call determines which JD required and preferred skills the candidate genuinely has, with per-skill reasoning logged for auditability
 - YoE gap calculation and scoring
 - Seniority level comparison
 - Domain overlap ratio
@@ -79,7 +79,7 @@ Applies weights to alignment signals and enforces hard gate checks:
 | Experience | 25% | YoE gap, seniority alignment, domain overlap |
 | Quality | 20% | Mastery depth signals, red flags, publications/OSS/certs |
 
-Candidates failing the gate (< 25% skill coverage or < 50% of required YoE) score 0.0 immediately.
+Candidates failing the gate (< 40% required skill coverage or < 50% of required YoE) score 0.0 immediately.
 
 ### Stage 5 — Explainability Layer
 LLM-generated recruiter-facing summary for the top-N candidates only (cost control):
@@ -111,35 +111,33 @@ Each extraction step (role identity → hard requirements → soft requirements 
 
 ---
 
-### Embeddings: `BAAI/bge-small-en-v1.5` (local, semantic skill matching)
+### Skill Matching: LLM-based (alignment engine)
 
-Used in the alignment engine to match JD skills against candidate skills via cosine similarity.
+A single structured LLM call per resume determines which JD required and preferred skills the candidate genuinely has. Coverage is binary — matched or missing. Partial matches are intentionally excluded: they are ambiguous and dilute the signal. When uncertain, the model marks a skill as missing (false negatives are safer than false positives in a gate-enforcing system).
 
-**Why embeddings over exact string matching:**
-Exact matching fails silently and systematically. `NLP` ≠ `Natural Language Processing`. `ML` ≠ `Machine Learning`. `Spark` ≠ `Apache Spark`. A candidate who lists `deep learning` should match a JD requirement for `neural networks`. Cosine similarity on skill embeddings handles all of these correctly.
+**Why LLM over embedding cosine similarity:**
 
-**Why `BAAI/bge-small-en-v1.5` specifically:**
-- Runs fully locally — no API cost, no data privacy concern (resumes contain PII)
-- Strong performance on retrieval tasks (MTEB benchmark), well-suited to short skill token matching
-- Small enough to run on CPU without meaningful latency
+Embeddings at any fixed threshold produce systematic errors in two directions:
+- **False positives across adjacent domains**: `"microservices"` and `"agent-based systems"` have high cosine similarity but are not the same skill.
+- **Depth insensitivity**: `"PyTorch for inference"` and `"PyTorch for model training"` embed nearly identically. A role requiring training experience should not match a candidate who has only served models.
 
-**Alternative considered: OpenAI `text-embedding-3-small`**
-- Advantage: higher benchmark scores on some tasks
-- Disadvantage: API cost per resume, PII sent to external API, adds network latency per call
+The LLM understands context: it can see that a candidate has `"Elasticsearch for search queries only"` and correctly decide this does NOT match `"retrieval systems"` as an ML skill. No threshold tuning required.
 
-**JD embedding cache:** JD skill embeddings are computed once per session and reused across all resumes. This means 100 resumes against the same JD requires only 1 JD encoding call, not 100.
+**Why not exact string matching:**
+`NLP` ≠ `Natural Language Processing`. `k8s` ≠ `Kubernetes`. `ML` ≠ `Machine Learning`. The LLM handles all synonym and alias resolution correctly without a hand-crafted lookup table.
 
----
+**Matching rules encoded in the prompt:**
+- Semantic synonyms accepted: `"NLP"` = `"Natural Language Processing"`, `"RL"` = `"reinforcement learning"`
+- Depth must be appropriate to the role: `"PyTorch for inference"` does NOT match `"PyTorch"` for a training-focused role
+- Adjacent domains excluded: `"microservices"` does NOT match `"agent-based systems"`
+- Classical ML ≠ deep learning: `"scikit-learn, XGBoost"` does NOT match `"PyTorch"` or `"TensorFlow"`
+- When uncertain → `matched: false`
 
-### Skill matching thresholds
+**Per-skill reasoning:** Every match decision includes a one-sentence reasoning string logged to the run artifacts. This makes the alignment layer fully auditable — a recruiter or engineer can inspect exactly why a skill was matched or missed.
 
-| Cosine similarity | Classification | Coverage weight |
-|---|---|---|
-| ≥ 0.82 | Full match | 1.0 |
-| 0.65 – 0.82 | Partial match | 0.6 |
-| < 0.65 | No match | 0.0 |
-
-Thresholds were chosen empirically on skill token pairs. At 0.82, `Python` matches `Python 3` but not `JavaScript`. At 0.65, `ML` matches `machine learning` but not `mechanical engineering`.
+**Alternative considered: `BAAI/bge-small-en-v1.5` embeddings**
+- Advantage: fully local, no API cost per resume, no PII sent externally
+- Disadvantage: requires threshold calibration that is JD-domain-specific and fragile; cannot handle depth differences or adjacent-domain false positives reliably. Removed after finding systematic errors on ML skill pairs.
 
 ---
 
@@ -147,9 +145,9 @@ Thresholds were chosen empirically on skill token pairs. At 0.82, `Python` match
 
 1. **No aggressive cleaning**: LLMs handle messy formatting, inconsistent whitespace, and mixed encodings well. Stripping text aggressively risks losing signal.
 2. **Section-aware extraction**: Explicit and implicit skills are extracted by separate tools, each with focused instructions. Explicit = what the candidate listed; implicit = what they demonstrably know from their history. Conflating them degrades signal quality.
-3. **Atomic skill tokens**: Extraction prompts enforce 1–4 word skill tokens. `"experience building scalable ML systems"` is not a skill token — `"MLOps"`, `"distributed training"`, `"Kubernetes"` are. This is the prerequisite for reliable embedding-based matching.
+3. **Atomic skill tokens**: Extraction prompts enforce 1–4 word skill tokens. `"experience building scalable ML systems"` is not a skill token — `"MLOps"`, `"distributed training"`, `"Kubernetes"` are. This is the prerequisite for reliable LLM-based skill matching — the model compares atomic tokens, not sentences.
 4. **Date normalisation**: The LLM computes YoE from date ranges in context. Candidate-stated values like "10+ years" are not trusted — the extractor derives the number independently.
-5. **Deduplication**: Explicit and implicit skills are merged with deduplication before embedding, explicit skills taking precedence (higher confidence).
+5. **Deduplication**: Explicit and implicit skills are merged with deduplication before alignment, with explicit skills taking precedence (higher confidence, directly stated).
 
 ---
 
@@ -158,7 +156,7 @@ Thresholds were chosen empirically on skill token pairs. At 0.82, `Python` match
 ### Challenge 1: Skill synonym problem
 **Problem**: Exact string matching produces false negatives on synonymous skill tokens. A JD requiring `NLP` would miss a candidate listing `Natural Language Processing`.
 
-**Solution**: Embedding-based semantic matching with a calibrated cosine similarity threshold. Both skill tokens are embedded independently and compared. Similarity 0.97 → full match.
+**Solution**: LLM-based skill matching with explicit synonym resolution rules encoded in the prompt. The model sees both the JD skill list and the candidate's explicit and implicit skills, and determines matches with a one-sentence reasoning per decision. `NLP` correctly matches `Natural Language Processing`; `microservices` correctly does not match `agent-based systems`. No threshold calibration required.
 
 ---
 
@@ -181,7 +179,7 @@ Thresholds were chosen empirically on skill token pairs. At 0.82, `Python` match
 
 **Solutions applied**:
 - JD is extracted once and cached — not re-extracted per resume
-- JD skill embeddings are cached in-session
+- Skill matching (1 LLM call per resume) is merged with required and preferred skills in a single call — not two separate calls
 - Explainability layer (most expensive call) only runs for top-N candidates, not the full set
 - `--parse-only` flag allows dry-run validation before any API calls are made
 - Parallel resume extraction via `ThreadPoolExecutor` reduces wall-clock time
@@ -215,35 +213,60 @@ Thresholds were chosen empirically on skill token pairs. At 0.82, `Python` match
 **Key observations:**
 - All `Good Match` candidates rank in the top 3 ✓
 - All `Poor Match` candidates are correctly gated out ✓
-- The mid-tier candidates (Sarah, Alex) are ranked correctly relative to each other but score higher than expected — likely because all required skills matched via embedding similarity and the quality component rewarded their depth signals
+- The mid-tier candidates (Sarah, Alex) are ranked correctly relative to each other but score higher than expected — likely because all required skills matched via LLM skill matching and the quality component rewarded their depth signals. Root cause analysis: pull `alignment.json` for these two candidates from `runs/` and inspect which skills matched and why.
 
-**Ryan Taylor (adversarial case):** This resume was deliberately crafted to contain all required skill keywords with no evidence of actual work. The gate correctly filtered this candidate due to insufficient verified skill coverage — skills listed but not demonstrated in work history did not appear in `implicit_skills`, driving coverage below the 25% gate threshold.
+**Ryan Taylor (adversarial case):** This resume was deliberately crafted to contain all required skill keywords with no work history evidence. The gate correctly filtered this candidate because explicit skills with no corroborating work history did not appear in `implicit_skills`, driving LLM-assessed coverage below the 40% gate threshold.
 
 ---
 
-### Metrics for a Larger Labelled Dataset
+### Three-Stage Evaluation Framework
 
-This is fundamentally a **ranking problem**, not a classification problem. A recruiter reviews the top 5 candidates — getting rank 1 wrong is worse than getting rank 8 wrong. Binary accuracy does not capture this.
+Evaluation runs against saved run artifacts — no re-running the pipeline, no extra API cost.
 
-**Primary metric: nDCG@K** (Normalised Discounted Cumulative Gain)
-
-nDCG rewards correct ordering at the top of the list with a logarithmic discount. A `Good Match` ranked 5th is penalised more than one ranked 3rd. This directly maps to recruiter behaviour — they work down a ranked list and stop when the shortlist is full.
-
-```
-nDCG@5 = DCG@5 / IDCG@5
-
-where DCG@5 = Σ (relevance_i / log2(i+1)) for i = 1..5
+```bash
+python evaluation/run_eval.py                     # all three stages, latest run
+python evaluation/run_eval.py --stage jd          # Stage 1 only
+python evaluation/run_eval.py --stage resume      # Stage 2 only
+python evaluation/run_eval.py --stage scoring     # Stage 3 only
+python evaluation/run_eval.py --run-id run_XXX    # specific run
 ```
 
-**Secondary metrics:**
+**Stage 1 — JD Extraction quality**
+
+Reads `runs/{run_id}/jd_profile.json` and compares against `evaluation/ground_truth/jd_gt.json`.
+
+| Metric | What it catches |
+|---|---|
+| Required skill Precision | Hallucinated required skills — inflates all candidate scores |
+| Required skill Recall | Missed required skills — silently underscores good candidates |
+| Preferred skill Precision / Recall | Same, with lower stakes |
+
+Required skill recall is the higher-stakes metric: a missed required skill propagates to every resume scored against this JD.
+
+**Stage 2 — Resume Extraction quality**
+
+Reads `runs/{run_id}/candidates/{slug}/resume_profile.json` and compares against `evaluation/ground_truth/resume_gt.json`. Evaluated separately for explicit and implicit skills, per candidate and as macro average.
+
+| Metric | What it catches |
+|---|---|
+| Explicit Precision | Hallucinated skills from the skills section |
+| Explicit Recall | Skills present in skills section but missed |
+| Implicit Precision | Skills inferred from work history without evidence — inflates scores for weak candidates |
+| Implicit Recall | Skills demonstrable from work history but missed — underscores good candidates |
+
+Implicit skill extraction is the highest-risk component. The evaluation tool prints missed and hallucinated implicit skills per candidate so failures are directly actionable.
+
+**Stage 3 — Scoring quality**
+
+Reads `runs/{run_id}/ranked_results.json` and compares against `evaluation/eval_dataset.json`.
 
 | Metric | Why |
 |---|---|
-| `Precision@3`, `Precision@5` | Fraction of top-N shortlist that are genuine matches — direct proxy for recruiter time wasted |
-| `Spearman ρ` | Overall rank correlation — interpretable sanity check across the full ranked list |
-| `Pearson r` | Score calibration — are our 0.8s actually better than our 0.5s on average? |
+| **nDCG@3** (primary) | Did the right people land in the top 3? Logarithmic discount penalises wrong ordering at the top more than at the bottom — matches recruiter behaviour |
+| **nDCG@5** (secondary) | Shortlist quality across the broader pool |
+| **Spearman ρ** | Overall rank correlation — interpretable sanity check across all 8 candidates |
 
-**What we would not use:** Binary accuracy or F1 — a `Partial Match` scored 0.48 vs 0.52 is not a meaningful error. The use case is ranking, not classification.
+nDCG uses graded relevance labels (1.0 / 0.75 / 0.5 / 0.0) — not binary. This correctly penalises ranking a Partial Match above a Good Match, which binary accuracy would not catch.
 
 **Production labelling strategy:** Recruiter thumbs up/down, interview invite, and hire outcome can serve as weak supervision labels. These can be used to tune the tier weights (currently heuristic) via a simple logistic regression on the three component scores: `[skill_score, experience_score, quality_score] → hire_outcome`.
 
@@ -293,6 +316,7 @@ resume-matcher/
 ├── .env.example
 ├── src/
 │   ├── engine.py                         # Main orchestrator
+│   ├── run_saver.py                      # Persists run artifacts (jd_profile, resume_profile, alignment, scoring)
 │   ├── extraction/
 │   │   ├── jd_extraction/
 │   │   │   ├── schemas.py                # JDProfile, HardRequirements, etc.
@@ -300,11 +324,11 @@ resume-matcher/
 │   │   │   └── extractor.py              # Deterministic sequential pipeline
 │   │   └── resume_extraction/
 │   │       ├── schemas.py                # ResumeProfile, SkillsProfile, etc.
-│   │       ├── agent_tools.py            # 5 focused LLM extraction tools
+│   │       ├── agent_tools.py            # 5 focused LLM extraction tools (incl. explicit/implicit split)
 │   │       └── extractor.py              # Deterministic sequential pipeline
 │   ├── scoring/
 │   │   ├── schemas.py                    # AlignmentResult, ScoringBreakdown
-│   │   ├── aligner.py                    # Semantic matching, experience, quality signals
+│   │   ├── aligner.py                    # LLM skill matching, experience, quality signals
 │   │   ├── scorer.py                     # Weight application, gate checks
 │   │   └── explainer.py                  # Recruiter-facing LLM explanation (top-N)
 │   └── utils/
@@ -314,10 +338,27 @@ resume-matcher/
 │   ├── sample_jd.txt                     # Sample job description
 │   └── resumes/                          # 8 synthetic evaluation resumes
 ├── evaluation/
-│   ├── eval_dataset.json                 # Ground truth labels
-│   └── metrics.py                        # nDCG, Spearman, Precision@K
+│   ├── __init__.py
+│   ├── run_eval.py                       # Three-stage evaluation runner (reads from runs/)
+│   ├── skill_matcher.py                  # Deterministic skill matcher for eval (no LLM)
+│   ├── eval_dataset.json                 # Ground truth relevance labels for scoring eval
+│   └── ground_truth/
+│       ├── jd_gt.json                    # Ground truth required/preferred skills for JD eval
+│       └── resume_gt.json                # Ground truth explicit/implicit skills per candidate
+├── runs/                                 # Auto-generated run artifacts (gitignored)
+│   └── run_YYYYMMDD_HHMMSS/
+│       ├── run_meta.json
+│       ├── jd_raw.txt
+│       ├── jd_profile.json
+│       ├── candidates/{slug}/
+│       │   ├── resume_raw.txt
+│       │   ├── resume_profile.json
+│       │   ├── alignment.json
+│       │   └── scoring.json
+│       ├── ranked_results.json
+│       └── eval_results.json             # Written by run_eval.py
 └── notebooks/
-    └── evaluation.ipynb                  # Visual evaluation (run after main.py)
+    └── evaluation.ipynb                  # Visual evaluation (run after main.py + run_eval.py)
 ```
 
 ---
@@ -330,7 +371,7 @@ resume-matcher/
 The current tier weights (55/25/20) are heuristic. Once recruiter feedback is collected (thumbs up/down, interview invite, hire outcome), these can be replaced with learned weights via logistic regression on `[skill_score, experience_score, quality_score]`. This requires ~200–300 labelled examples to be reliable.
 
 **Skill taxonomy**
-Exact deduplication of skills currently uses lowercased string comparison. A curated skill taxonomy (`ML` → `machine learning`, `k8s` → `Kubernetes`) would improve both deduplication and the embedding matching display. The embedding matching already handles synonyms semantically — the taxonomy would clean the display labels.
+The LLM skill matcher handles synonym resolution contextually, but display labels in output can be noisy (`"ML"` and `"machine learning"` may both appear in results as separate entries). A curated taxonomy (`ML` → `machine learning`, `k8s` → `Kubernetes`) would clean display labels. The `skill_matcher.py` alias map in `evaluation/` is a starting point — it can be promoted to a shared normalisation utility.
 
 **Bias audit**
 Scoring distributions should be checked across demographic proxies (name origin, institution tier, location) before any production deployment. This is a legal and ethical requirement in regulated hiring environments. The `highest_company_tier` signal was deliberately excluded from scoring for this reason — prestige bias would systematically penalise strong candidates from less-known companies.
@@ -345,8 +386,8 @@ Connect to Workday or Greenhouse via API for real-time scoring on inbound applic
 **Async job queue**
 The current `ThreadPoolExecutor` approach works well up to ~50 resumes. For batch processing thousands of resumes (e.g. end-of-posting-period bulk review), move to a Celery + Redis job queue with async LLM calls. The extraction pipeline is already designed with per-resume isolation — one failure doesn't block others.
 
-**Embedding model fine-tuning**
-`BAAI/bge-small-en-v1.5` is a general-purpose retrieval model. Fine-tuning on domain-specific resume-JD skill pairs (using recruiter match/no-match labels as supervision) would improve cosine similarity calibration for the specific vocabulary of the target role domain.
+**LLM skill matching prompt refinement**
+The skill matching prompt encodes domain-agnostic rules (depth sensitivity, adjacent domain exclusion). For a specific domain (e.g. ML engineering roles exclusively), few-shot examples of correct and incorrect decisions added to the prompt would improve match accuracy without any model training. Disagreement cases from `eval_results.json` are the natural source for these examples.
 
 ---
 

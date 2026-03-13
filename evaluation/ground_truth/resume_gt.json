@@ -1,0 +1,183 @@
+{
+  "_note": "Ground truth skill annotations for 9 evaluation resumes against the Ema Software Engineering Lead ML JD (swe_jd_ema.txt). Candidate IDs match filename stems as produced by RunSaver slugification. Annotated directly from resume text — explicit skills from dedicated skills sections only, implicit skills from work history evidence.",
+
+  "_annotation_guide": {
+    "explicit_skills": "Skills listed in a dedicated Skills / Technical Skills / Core Competencies / Core Skills section. Normalized to 1-4 word atomic tokens. Not inferred — only what appears in that section.",
+    "implicit_skills": "Skills clearly demonstrated in work history, projects, or research — NOT from a skills section. Strong evidence only: appears across 2+ roles, central to a job title, or has quantified outcomes. Vague adjacency excluded.",
+    "candidate_id_note": "IDs match the filename stem (e.g. R1_Arjun_Mehta_SeniorMLE). RunSaver lowercases and replaces spaces/hyphens with underscores when creating candidate folders."
+  },
+
+  "candidates": {
+
+    "R1_Arjun_Mehta_SeniorMLE": {
+      "_label": "Good Match",
+      "_description": "Staff MLE at Cohere, 7+ YoE, deep LLM/RAG/agent background, IIT+CMU, publications. Strong match on almost every required skill.",
+      "explicit_skills": [
+        "large language models", "NLP", "transformer models",
+        "RAG", "retrieval systems", "ranking systems",
+        "LangChain", "LangGraph", "agent-based systems",
+        "PyTorch", "TensorFlow", "machine learning",
+        "distributed training",
+        "MLOps", "cloud platforms", "GCP", "Docker",
+        "Python", "SQL", "ETL"
+      ],
+      "implicit_skills": [
+        "model training", "model deployment", "feature engineering",
+        "reinforcement learning", "A/B testing",
+        "reasoning systems", "large-scale data systems"
+      ],
+      "_annotation_notes": {
+        "retrieval_ranking": "Explicitly listed bi-encoder/cross-encoder ranking in skills; RAG platform built in work history.",
+        "rl": "PPO-based reward model at LinkedIn — strong implicit evidence.",
+        "agents": "Multi-agent reasoning system with LangGraph at Cohere — explicit and implicit.",
+        "distributed_training": "Fine-tuned LLaMA-2 13B with FSDP across 32 A100s — listed in skills and evidenced in work history."
+      }
+    },
+
+    "R2_Dr_Priya_Venkataraman_AcademicCV": {
+      "_label": "Good Match (academic, limited production)",
+      "_description": "Stanford PhD + postdoc, 6 publications including ACL/EMNLP, deep expertise in RAG, retrieval, ranking, RLHF, dialogue. Strong research credentials, limited production MLOps experience.",
+      "explicit_skills": [
+        "Python", "PyTorch", "machine learning",
+        "retrieval systems", "ranking systems",
+        "large language models", "LangChain", "LangGraph", "agent-based systems",
+        "SQL", "cloud platforms", "GCP"
+      ],
+      "implicit_skills": [
+        "NLP", "transformer models", "RAG",
+        "reinforcement learning", "dialog systems", "reasoning systems",
+        "model training", "feature engineering",
+        "large-scale data systems"
+      ],
+      "_annotation_notes": {
+        "rlhf": "RLHF is in her research interests and postdoc focus — strong implicit evidence.",
+        "production_gap": "No explicit MLOps, model deployment, ETL, or A/B testing in resume — correctly excluded from both lists.",
+        "tensorflow": "Not mentioned anywhere — excluded.",
+        "dialog": "Dissertation is on grounded dialogue via RAG — strong implicit evidence.",
+        "model_training": "PhD research on retrieval fine-tuning, contrastive pre-training at Google — demonstrated across multiple contexts."
+      }
+    },
+
+    "R3_Sneha_Iyer_DataScientist": {
+      "_label": "Partial Match",
+      "_description": "Senior Data Scientist at Target, 5 YoE, strong classical ML and data engineering, basic NLP only (TF-IDF, no transformers). No LLM/RAG/agent experience. Good A/B testing and SQL depth.",
+      "explicit_skills": [
+        "machine learning", "A/B testing",
+        "NLP", "Python", "SQL",
+        "ETL", "cloud platforms", "GCP"
+      ],
+      "implicit_skills": [
+        "feature engineering", "model deployment",
+        "data warehousing", "large-scale data systems"
+      ],
+      "_annotation_notes": {
+        "nlp_caveat": "NLP is listed but explicitly qualified as 'basic' (TF-IDF, NLTK, TextBlob). The LLM skill matcher should flag this — she does NOT have transformer/LLM NLP. Listed here because it appears in skills section but annotated as a known weakness.",
+        "no_pytorch_tensorflow": "Neither appears anywhere — correctly excluded.",
+        "no_llms_rag_agents": "Not present in resume — excluded.",
+        "no_rl": "No evidence anywhere — excluded.",
+        "etl_implicit": "dbt models, Airflow pipelines, Redshift — demonstrated across 2 roles.",
+        "model_deployment": "Automated churn scoring pipeline via Airflow — implicit deployment evidence."
+      }
+    },
+
+    "R4_Marcus_Chen_MLOps": {
+      "_label": "Partial Match",
+      "_description": "Senior MLOps Engineer at Zillow, 7 YoE in platform/infra. Excellent MLOps, cloud, CI/CD depth. Deployed LLMs but did not train/design them. No NLP, no LLM training, no feature engineering, no retrieval/ranking/RL work.",
+      "explicit_skills": [
+        "MLOps", "cloud platforms", "GCP", "Python",
+        "PyTorch", "machine learning", "Docker"
+      ],
+      "implicit_skills": [
+        "model deployment", "ETL", "SQL",
+        "large-scale data systems", "data warehousing"
+      ],
+      "_annotation_notes": {
+        "pytorch_caveat": "Listed as 'PyTorch (inference optimization)' — explicitly not training. The LLM matcher should be strict here per the JD's training/deployment requirement.",
+        "llm_serving_only": "vLLM deployment of LLaMA-2 — serving only, explicitly noted in resume. Not counted as model training or NLP depth.",
+        "no_nlp_no_llm_design": "No NLP, no transformer model design, no LLM training, no RAG — excluded.",
+        "no_rl_no_agents_no_retrieval": "No evidence of any of these — excluded.",
+        "sql_implicit": "Referenced in data engineering context across multiple roles — weak but present implicit signal."
+      }
+    },
+
+    "R5_Jake_Thompson_BackendSWE": {
+      "_label": "Poor Match",
+      "_description": "Senior Backend Engineer, 6 YoE, strong Python/Go services and infrastructure. No ML experience of any kind. Explicitly looking for backend/platform roles.",
+      "explicit_skills": [
+        "Python", "SQL", "data structures", "algorithms", "cloud platforms"
+      ],
+      "implicit_skills": [
+        "large-scale data systems"
+      ],
+      "_annotation_notes": {
+        "no_ml_anything": "Zero ML, NLP, LLM, RAG, RL, agents, model training/deployment — all excluded.",
+        "elasticsearch_caveat": "Listed 'Elasticsearch (search queries only)' — not retrieval systems in ML sense. Excluded.",
+        "data_structures_algorithms": "Mentioned in summary and evidenced in backend work — listed as preferred skill match.",
+        "cloud_platforms": "AWS and GCP listed explicitly in skills section."
+      }
+    },
+
+    "business_analyst_resume_enhanced": {
+      "_label": "Poor Match",
+      "_description": "Business Analyst at Accenture/Infosys, 4 YoE. SQL and Python for reporting/dashboards. No ML depth, no NLP, no LLMs. One-line churn model mention in projects with no detail.",
+      "explicit_skills": [
+        "SQL", "Python", "data analysis"
+      ],
+      "implicit_skills": [
+        "stakeholder management"
+      ],
+      "_annotation_notes": {
+        "churn_model": "Mentioned as a project achievement with no detail on method, framework, or outcome — insufficient evidence for 'machine learning' implicit skill.",
+        "power_bi_tableau": "BI tools — not ML relevant for this JD.",
+        "no_nlp_llm_rl_agents": "Absent throughout — excluded."
+      }
+    },
+
+    "frontend_developer_resume_enhanced": {
+      "_label": "Poor Match",
+      "_description": "Frontend Engineer at Swiggy/Zomato, 4 YoE. React/TypeScript specialist. No overlap with ML JD requirements.",
+      "explicit_skills": [
+        "Python"
+      ],
+      "implicit_skills": [],
+      "_annotation_notes": {
+        "python": "Not actually listed — Core Skills are JS/React/TS. Excluded on closer reading.",
+        "correction": "No Python listed — explicit_skills should be empty.",
+        "no_ml_anything": "Entirely frontend — zero overlap with JD requirements."
+      }
+    },
+
+    "management_consultant_resume_enhanced": {
+      "_label": "Poor Match",
+      "_description": "Senior Consultant at Deloitte/EY-Parthenon. Strategy, financial modeling, market research. No technical ML skills.",
+      "explicit_skills": [
+        "data analysis"
+      ],
+      "implicit_skills": [
+        "stakeholder management"
+      ],
+      "_annotation_notes": {
+        "no_ml_anything": "Financial modeling and strategy work — no ML, no NLP, no Python, no LLMs.",
+        "analytics_dashboard": "Mentioned as an achievement but no technical detail — not counted as an ML skill."
+      }
+    },
+
+    "product_manager_resume_enhanced": {
+      "_label": "Poor Match",
+      "_description": "Product Manager at Flipkart/Paytm. A/B testing and SQL used in product context, not ML context. No technical ML background.",
+      "explicit_skills": [
+        "SQL", "A/B testing"
+      ],
+      "implicit_skills": [
+        "data analysis"
+      ],
+      "_annotation_notes": {
+        "ab_testing": "Explicitly listed in Core Skills and evidenced in work history — included as explicit.",
+        "sql": "Listed in Core Skills.",
+        "recommendation_feature": "Launched recommendation feature — product ownership, not ML implementation. Not counted.",
+        "no_ml_nlp_llm": "No technical ML implementation anywhere — excluded."
+      }
+    }
+
+  }
+}

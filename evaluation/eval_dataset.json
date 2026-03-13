@@ -1,0 +1,55 @@
+{
+  "_note": "Ground truth relevance labels for the 8 synthetic evaluation resumes. Labels were assigned BEFORE running the system — not post-hoc rationalisation of system output. Candidate IDs must match filename stems in data/resumes/ (and therefore candidate_name in ranked_results.json).",
+
+  "_label_scale": {
+    "1.0":  "Good Match — should be shortlisted, clearly meets the bar",
+    "0.75": "Good Match with known gap — shortlist-worthy despite one weakness",
+    "0.5":  "Partial Match — could interview with reservations, needs probing",
+    "0.0":  "Poor Match — should not be shortlisted"
+  },
+
+  "_why_not_binary": "nDCG requires graded relevance. A binary 0/1 label treats 'Partial Match' as equivalent to 'Poor Match', which doesn't reflect recruiter behaviour. Using 0.5 for Partial correctly penalises the system for ranking a Partial Match above a Good Match.",
+
+  "candidates": [
+    {
+      "id":    "priya_sharma",
+      "label": 1.0,
+      "note":  "Strong all-round match. Expected rank: 1-2."
+    },
+    {
+      "id":    "chen_li",
+      "label": 1.0,
+      "note":  "Strong match with publications bonus. Expected rank: 1-2."
+    },
+    {
+      "id":    "james_wu",
+      "label": 0.75,
+      "note":  "Good skills match but 1yr YoE gap. Expected rank: 3."
+    },
+    {
+      "id":    "sarah_okonkwo",
+      "label": 0.5,
+      "note":  "Partial match — classical ML strong, LLM depth weak. Expected rank: 4-5."
+    },
+    {
+      "id":    "alex_nguyen",
+      "label": 0.5,
+      "note":  "Partial match — junior, limited LLM/RAG exposure. Expected rank: 4-5."
+    },
+    {
+      "id":    "michael_patel",
+      "label": 0.0,
+      "note":  "No ML background. Should be gated out."
+    },
+    {
+      "id":    "ryan_taylor",
+      "label": 0.0,
+      "note":  "Adversarial — buzzword stuffed, no work history evidence. Should be gated out."
+    },
+    {
+      "id":    "jessica_brown",
+      "label": 0.0,
+      "note":  "Marketing background, no technical skills. Should be gated out."
+    }
+  ]
+}

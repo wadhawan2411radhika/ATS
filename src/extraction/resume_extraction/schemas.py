@@ -34,11 +34,6 @@ class CompanyTier(str, Enum):
     TIER_4 = "tier_4"   # Unknown / very small / stealth
     ACADEMIC = "academic"
 
-class SkillRecency(str, Enum):
-    RECENT = "recent"           # Used in last 2 years
-    ESTABLISHED = "established" # Used 2-5 years ago
-    DATED = "dated"             # Last used 5+ years ago
-
 
 # ── Sub-schemas (assembled by agent tools) ─────────────────────────────────────
 
