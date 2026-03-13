@@ -279,6 +279,7 @@ def _ndcg_at_k(
     predicted_order: list[str],
     gt_labels: dict[str, float],
     k: int,
+    resolver=None,
 ) -> float:
     """
     nDCG@K — Normalised Discounted Cumulative Gain at cutoff K.
@@ -288,12 +289,52 @@ def _ndcg_at_k(
     Directly maps to recruiter behaviour: they review down a list and stop.
     """
     top_k = predicted_order[:k]
-    dcg   = _dcg([gt_labels.get(cid, 0.0) for cid in top_k])
+    lookup = resolver if resolver else (lambda cid, gt: gt.get(cid, 0.0))
+    dcg   = _dcg([lookup(cid, gt_labels) for cid in top_k])
 
     ideal_relevances = sorted(gt_labels.values(), reverse=True)[:k]
     idcg  = _dcg(ideal_relevances)
 
     return round(dcg / idcg, 4) if idcg > 0 else 0.0
+
+
+def _resolve_gt_label(cid: str, gt_labels: dict[str, float]) -> float:
+    """
+    Match a candidate_name from ranked_results.json to a GT label.
+
+    Tries in order:
+      1. Exact match          — "Arjun Mehta" == "Arjun Mehta"
+      2. Case-insensitive     — handles minor casing differences
+      3. Token containment    — "Arjun Mehta" contained in "R1_Arjun_Mehta_SeniorMLE"
+                                or vice versa (covers filename-stem GT IDs)
+
+    Returns 0.0 if no match found and logs a warning.
+    """
+    # 1. Exact
+    if cid in gt_labels:
+        return gt_labels[cid]
+
+    # 2. Case-insensitive exact
+    cid_lower = cid.lower()
+    for key, val in gt_labels.items():
+        if key.lower() == cid_lower:
+            return val
+
+    # 3. Token containment — normalise both sides to lowercase words
+    cid_tokens = set(cid_lower.replace(".", "").replace("_", " ").split())
+    for key, val in gt_labels.items():
+        key_tokens = set(key.lower().replace(".", "").replace("_", " ").split())
+        # Match if all significant tokens from the shorter set appear in the longer
+        shorter = cid_tokens if len(cid_tokens) <= len(key_tokens) else key_tokens
+        longer  = key_tokens if len(cid_tokens) <= len(key_tokens) else cid_tokens
+        # Filter out common noise words
+        noise = {"dr", "mr", "ms", "the", "a", "an"}
+        significant = shorter - noise
+        if significant and significant.issubset(longer):
+            return val
+
+    logging.warning(f"No GT label found for candidate: '{cid}' — scoring as 0.0")
+    return 0.0
 
 
 def eval_scoring(run_dir: Path) -> dict:
@@ -307,11 +348,20 @@ def eval_scoring(run_dir: Path) -> dict:
     ranked           = ranked_results["ranked_results"]
     predicted_order  = [r["candidate_name"] for r in ranked]
     predicted_scores = [r["final_score"] for r in ranked]
-    gt_scores        = [gt_labels.get(cid, 0.0) for cid in predicted_order]
+
+    # Use fuzzy resolver — handles extracted name vs filename-stem ID mismatches
+    gt_scores = [_resolve_gt_label(cid, gt_labels) for cid in predicted_order]
+
+    # Warn if any candidate couldn't be resolved
+    unresolved = [cid for cid, gt in zip(predicted_order, gt_scores)
+                  if gt == 0.0 and cid not in gt_labels]
+    if unresolved:
+        print(f"\n  ⚠  Could not resolve GT labels for: {unresolved}")
+        print("     → Check eval_dataset.json IDs match candidate_name in ranked_results.json")
 
     # ── Metrics ────────────────────────────────────────────────────────────────
-    ndcg3       = _ndcg_at_k(predicted_order, gt_labels, k=3)
-    ndcg5       = _ndcg_at_k(predicted_order, gt_labels, k=5)
+    ndcg3       = _ndcg_at_k(predicted_order, gt_labels, k=3, resolver=_resolve_gt_label)
+    ndcg5       = _ndcg_at_k(predicted_order, gt_labels, k=5, resolver=_resolve_gt_label)
     spearman_r, spearman_p = spearmanr(predicted_scores, gt_scores)
 
     print(f"\n  nDCG@3     : {ndcg3:.4f}   (primary — did the right people land in top 3?)")

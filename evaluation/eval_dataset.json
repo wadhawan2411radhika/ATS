@@ -1,55 +1,59 @@
 {
-  "_note": "Ground truth relevance labels for the 8 synthetic evaluation resumes. Labels were assigned BEFORE running the system — not post-hoc rationalisation of system output. Candidate IDs must match filename stems in data/resumes/ (and therefore candidate_name in ranked_results.json).",
+  "_note": "Ground truth relevance labels. Candidate IDs match candidate_name in ranked_results.json — the LLM-extracted full name from each resume. Labels were assigned before running the system.",
 
   "_label_scale": {
-    "1.0":  "Good Match — should be shortlisted, clearly meets the bar",
-    "0.75": "Good Match with known gap — shortlist-worthy despite one weakness",
-    "0.5":  "Partial Match — could interview with reservations, needs probing",
-    "0.0":  "Poor Match — should not be shortlisted"
+    "1.0": "Good Match — meets the bar, should be shortlisted",
+    "0.5": "Partial Match — could interview with reservations",
+    "0.0": "Poor Match — should not be shortlisted"
   },
 
-  "_why_not_binary": "nDCG requires graded relevance. A binary 0/1 label treats 'Partial Match' as equivalent to 'Poor Match', which doesn't reflect recruiter behaviour. Using 0.5 for Partial correctly penalises the system for ranking a Partial Match above a Good Match.",
+  "_id_note": "IDs must match candidate_name field in ranked_results.json exactly. RunSaver stores candidate_name from resume.identity.full_name (LLM-extracted), not from the filename.",
 
   "candidates": [
     {
-      "id":    "priya_sharma",
+      "id":    "Arjun Mehta",
       "label": 1.0,
-      "note":  "Strong all-round match. Expected rank: 1-2."
+      "note":  "Staff MLE at Cohere, 7+ YoE, deep LLM/RAG/agent stack, IIT+CMU, publications. Expected rank: 1."
     },
     {
-      "id":    "chen_li",
+      "id":    "Dr. Priya Venkataraman",
       "label": 1.0,
-      "note":  "Strong match with publications bonus. Expected rank: 1-2."
+      "note":  "PhD+postdoc, exceptional research depth, but 2 seniority levels below Lead, no production MLOps. Good Match — gap is a caveat, not a demotion. Expected rank: 2."
     },
     {
-      "id":    "james_wu",
-      "label": 0.75,
-      "note":  "Good skills match but 1yr YoE gap. Expected rank: 3."
-    },
-    {
-      "id":    "sarah_okonkwo",
+      "id":    "Marcus Chen",
       "label": 0.5,
-      "note":  "Partial match — classical ML strong, LLM depth weak. Expected rank: 4-5."
+      "note":  "Sr. MLOps Engineer, strong infra/deployment, but no NLP/LLM training depth. Expected rank: 3-4."
     },
     {
-      "id":    "alex_nguyen",
+      "id":    "Sneha Iyer",
       "label": 0.5,
-      "note":  "Partial match — junior, limited LLM/RAG exposure. Expected rank: 4-5."
+      "note":  "Sr. Data Scientist, classical ML strong, NLP is TF-IDF only, no LLMs/RAG/RL. Expected rank: 3-4."
     },
     {
-      "id":    "michael_patel",
+      "id":    "Shaym Narayan",
       "label": 0.0,
-      "note":  "No ML background. Should be gated out."
+      "note":  "Frontend Engineer. Zero ML overlap. Should gate out."
     },
     {
-      "id":    "ryan_taylor",
+      "id":    "Kamal Anand",
       "label": 0.0,
-      "note":  "Adversarial — buzzword stuffed, no work history evidence. Should be gated out."
+      "note":  "Management Consultant. No technical ML skills. Should gate out."
     },
     {
-      "id":    "jessica_brown",
+      "id":    "Ram Sharma",
       "label": 0.0,
-      "note":  "Marketing background, no technical skills. Should be gated out."
+      "note":  "Business Analyst. SQL/Python for reporting only. Should gate out."
+    },
+    {
+      "id":    "Jake Thompson",
+      "label": 0.0,
+      "note":  "Backend SWE. Strong Python/Go but zero ML. Should gate out."
+    },
+    {
+      "id":    "Rahul Soni",
+      "label": 0.0,
+      "note":  "Product Manager. A/B testing and SQL in product context, not ML. Should gate out."
     }
   ]
 }

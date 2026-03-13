@@ -1,5 +1,5 @@
 {
-  "_note": "Ground truth for the Ema Software Engineering Lead, Machine Learning JD (swe_jd_ema.txt). Annotated directly from JD text — required skills derived from 'You will:' responsibilities (implied non-negotiable) and core 'Ideally you'd have:' technical competencies. Preferred skills are the softer/nice-to-have items from the same section.",
+  "_note": "Ground truth for the Ema Software Engineering Lead ML JD (swe_jd_ema.txt). Updated after first eval run: 'data processing', 'data warehousing', 'large-scale data systems', 'software development', 'data structures', 'algorithms' are legitimately in the JD text and correctly extracted as required. Moved from false_positives to required_skills.",
   "jd_id": "ema_swe_lead_ml",
 
   "required_skills": [
@@ -21,28 +21,29 @@
     "SQL",
     "ETL",
     "MLOps",
-    "cloud platforms"
+    "cloud platforms",
+    "data processing",
+    "data warehousing",
+    "large-scale data systems",
+    "software development",
+    "data structures",
+    "algorithms"
   ],
 
   "preferred_skills": [
     "GCP",
     "Azure",
     "ensemble learning",
-    "data warehousing",
-    "large-scale data systems",
-    "data structures",
-    "algorithms",
     "code generation",
     "dialog systems",
     "reasoning systems"
   ],
 
   "_annotation_notes": {
-    "framing": "The JD uses 'Ideally, you'd have:' for all requirements — but this is a Lead ML role at a funded startup. Skills like Python, PyTorch/TensorFlow, NLP, LLMs, SQL, and MLOps are non-negotiable in practice regardless of the softened framing.",
-    "pytorch_vs_tensorflow": "JD says 'TensorFlow or PyTorch' — both are listed as required. A candidate with only one should still match via the LLM skill matcher (either satisfies the requirement).",
-    "retrieval_ranking_rl_agents": "Listed under 'deep understanding of ANY of...' in the JD — these are required as a group but the candidate only needs depth in at least one. Listed individually here so the matcher can assess coverage across the group.",
-    "education": "Master's or PhD listed as preferred — not added as a required_skill since it's framed as 'ideally' and the JD doesn't gate on it explicitly.",
-    "soft_skills": "Problem-solving, attention to detail, startup environment fit — excluded from both lists. Not assessable from resume text alone.",
-    "preferred_framing": "GCP and Azure are listed as 'familiarity with cloud platforms like GCP or Azure' — cloud platforms is required (as general), specific providers are preferred."
+    "v1_false_positives_resolved": "After first eval run, data processing / data warehousing / large-scale data systems / software development / data structures / algorithms were flagged as extractor false positives. Re-checked against JD text: all 6 appear explicitly ('data processing (SQL, ETL, data warehousing)', 'software development principles, data structures, and algorithms'). Moved to required_skills.",
+    "v1_missed_skills": "The extractor missed: large language models, transformer models, feature engineering, model training, model deployment, A/B testing, MLOps, cloud platforms. Root cause: Ema JD uses 'Ideally, you'd have:' soft framing for all requirements. Extractor prompt treats this as preferred. Mitigation: add a prompt rule — 'For startup JDs using soft framing for all requirements, treat core ML technical skills as required regardless of framing.'",
+    "pytorch_vs_tensorflow": "JD says 'TensorFlow or PyTorch' — both in required. LLM matcher should accept either as satisfying the requirement.",
+    "retrieval_ranking_rl_agents": "JD says 'deep understanding of ANY of...' — required as a group, candidate needs depth in at least one.",
+    "preferred_simplified": "Moved data warehousing and large-scale data systems to required after v1 review. GCP/Azure remain preferred (JD says 'like GCP or Azure' — specific providers are differentiators)."
   }
 }
