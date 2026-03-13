@@ -1,0 +1,47 @@
+﻿Take-Home Assignment: Resume Matching Solution - Client Presentation
+Overview
+The goal of this project is to build, evaluate, and document a proof-of-concept (POC) for an AI-powered resume and job description matching system. Your work will be reviewed by the customer’s TL to assess its technical feasibility and performance.
+Time to Complete: 2-3 days
+Deliverable: Submit a working prototype alongside a presentation that breaks down our goals, the challenges overcome, the technical solution, and our planned next steps.
+Scenario
+Internal Need
+Our Talent Acquisition team is struggling with their current manual process for screening resumes. It's slow, inconsistent, and they suspect many qualified candidates are being overlooked. They have asked the AI team to develop a prototype that can automatically score and rank resumes based on their relevance to a specific job description.
+Your Audience
+You will be presenting your work to the Technical Lead of the AI Solutions team. They are interested in:
+* Your technical approach and reasoning.
+* The performance and limitations of your model.
+* The quality, clarity, and reproducibility of your code.
+* Next steps to deploy this into production
+Your Role
+You are the lead AI Engineer tasked with building the core matching engine for this new system. Your goal is to demonstrate a robust and well-reasoned technical solution.
+Project Requirements
+Your submission must include the following components within a Git repository:
+1. Core Task: Build the Matching Engine
+Develop a Python-based system that takes a job description and a set of resumes (as text or files) as input and produces a relevance score (e.g., from 0.0 to 1.0) for each resume.
+2. Technical Approach & Justification (in README.md)
+In your README.md, clearly explain the technical approach you chose.
+* Model Selection: Which model or algorithm did you use for the core matching task ?
+* Justification: Why did you choose this approach? What are its primary advantages and disadvantages compared to at least one alternative you considered?
+* Feature Engineering/Data Preprocessing: Describe the steps you took to clean and prepare the text data 
+3. Performance Evaluation (in README.md and/or a separate notebook)
+Since we don't have a labeled dataset, you will need to create a small, synthetic one for evaluation.
+* Create a sample job description and 5-10 sample resumes.
+* Manually label each resume as "Good Match" (1), "Partial Match" (0.5), or "Poor Match" (0).
+* Run your system on this evaluation set and present the scores.
+* Discuss how you would formally measure the success of this model if you had a larger, labeled dataset. What metrics would be most important (e.g., Precision, Recall, nDCG, etc.) and why?
+4. Code & Documentation
+Your repository should be well-organized and easy for another engineer to understand and run.
+* README.md: Your primary documentation explaining the project, setup, and how to run your code.
+* requirements.txt: A list of all Python dependencies.
+* Clear Code: Your code should be well-commented and structured logically.
+5. Client Presentation & Live Demo
+You will present your solution to a panel acting as the Customer Stakeholders. You will be evaluated on your ability to translate technical complexity into business value.
+* Explain the objective, the solution design, and how it addresses specific recruitment challenges.
+* Live Demo: A walkthrough of your working prototype.
+* Q&A & Objection Handling: You must defend your design choices, address potential limitations, and respond to stakeholder "pushback" or edge-case scenarios.
+5. Evaluation Criteria
+Your submission will be evaluated based on:
+* Technical Correctness: Does the solution work as described?
+* Methodology & Reasoning: Is your choice of model and evaluation strategy well-justified?
+* Critical Thinking: Do you show a good understanding of the model's limitations and a clear vision for future improvements?
+* Communication: How effectively you can communicate the pros of your approach
